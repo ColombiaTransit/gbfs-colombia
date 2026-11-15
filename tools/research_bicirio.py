@@ -54,6 +54,8 @@ class PublicAssets(HTMLParser):
         d = dict(attrs)
         if tag == "script" and d.get("src"):
             self.assets.append(d["src"])
+        if tag == "link" and "modulepreload" in d.get("rel", "").lower() and d.get("href"):
+            self.assets.append(d["href"])
         if tag == "iframe" and d.get("src"):
             self.iframes.append(d["src"])
         if tag == "title":
@@ -121,6 +123,8 @@ def summarize(url, content):
             if parsed.scheme in ("http", "https") and parsed.hostname:
                 hosts.add(parsed.hostname)
         print("  JS referenced hosts (not requested)", sorted(hosts)[:40])
+        chunks = sorted(set(re.findall(r"[A-Za-z0-9_.-]*chunk-[A-Za-z0-9_-]+\\.js", content)))
+        print("  dynamic chunk references", chunks[:60])
         for term in ("/stations", "free_access", "get_all_by_station",
                      "stations/get_all", "api", "base", "environment",
                      "API_URL", "apiUrl", "baseUrl", "baseURL", "backend",
