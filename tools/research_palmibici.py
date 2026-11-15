@@ -93,6 +93,20 @@ def main():
         except (TimeoutError, OSError, urllib.error.URLError) as exc:
             print("PAGE", page or "/", "ERROR", type(exc).__name__, str(exc)[:150])
 
+    # Probe only public API base paths; no authentication or user data.
+    for public_path in ("", "api"):
+        probe = urllib.parse.urljoin("https://back.palmibici.com.co/", public_path)
+        try:
+            status, resolved, response_body = fetch(probe)
+            print("BACKEND", scrub(probe), "HTTP", status,
+                  "body_chars", len(response_body),
+                  "redirected_to", scrub(resolved))
+        except urllib.error.HTTPError as error:
+            print("BACKEND", scrub(probe), "HTTP", error.code)
+        except (TimeoutError, OSError, urllib.error.URLError) as error:
+            print("BACKEND", scrub(probe), "ERROR",
+                  type(error).__name__, str(error)[:120])
+
     print("SAME-ORIGIN SCRIPTS (maximum %d)" % MAX_JS)
     for url in sorted(scripts)[:MAX_JS]:
         try:
