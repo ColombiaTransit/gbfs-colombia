@@ -5,6 +5,7 @@ No account requests, form submissions, credentials, authenticated endpoints,
 private APIs, arbitrary API brute-force, or per-user data are accessed.
 """
 from html.parser import HTMLParser
+import json
 import re
 import os
 import ssl
@@ -19,6 +20,9 @@ SITES = [
     "https://bicirio.somosmovilidad.gov.co/login",
     "https://bicirio.somosmovilidad.gov.co/register",
     "https://bicirio.somosmovilidad.gov.co/stations",
+    # Explicit public routes present in the official frontend's no-auth list:
+    "https://bicirio.somosmovilidad.gov.co/free_access/stations/get_all",
+    "https://bicirio.somosmovilidad.gov.co/free_access/bicycles/get_all_by_station",
     "https://somosmovilidad.gov.co/somos-mapa/leaflet-routing-machine-3.2.12/examples/index.html",
 ]
 DOMAINS = {"somosmovilidad.gov.co", "bicirio.somosmovilidad.gov.co"}
@@ -140,6 +144,24 @@ def main():
             code, actual, ctype, body = get(url)
             print("PAGE", display_safe(url), "status", code,
                   "bytes", len(body), "type", ctype, "final", display_safe(actual))
+            if "json" in ctype.lower():
+                try:
+                    result = json.loads(body)
+                    if isinstance(result, dict):
+                        print("  JSON top-level keys", sorted(result.keys())[:35])
+                        for key, val in list(result.items())[:10]:
+                            if isinstance(val, list):
+                                print("  JSON list", key, "length", len(val),
+                                      "first record keys", sorted(val[0].keys())[:30]
+                                      if val and isinstance(val[0], dict) else [])
+                    elif isinstance(result, list):
+                        print("  JSON array length", len(result),
+                              "first record keys", sorted(result[0].keys())[:30]
+                              if result and isinstance(result[0], dict) else [])
+                    else:
+                        print("  JSON value type", type(result).__name__)
+                except ValueError:
+                    print("  JSON decode failed")
             if "html" in ctype.lower() or "<html" in body[:2000].lower():
                 h = PublicAssets()
                 h.feed(body)
