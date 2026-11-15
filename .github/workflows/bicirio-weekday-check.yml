@@ -10,7 +10,7 @@ on:
   push:
     paths:
       - "tools/check_bicirio_weekday.py"
-      - "tests/test_bicirio_weekday.py"
+      - "tools/tests/test_bicirio_weekday.py"
       - ".github/workflows/bicirio-weekday-check.yml"
 
 permissions:
@@ -30,7 +30,7 @@ jobs:
       - name: Validate the check script offline
         run: |
           python -m compileall -q tools/check_bicirio_weekday.py
-          python -m unittest discover -s tests -p 'test_bicirio_weekday.py' -v
+          python -m unittest discover -s tools/tests -p 'test_bicirio_weekday.py' -v
 
       - name: Run only on the requested date (or manual dispatch)
         if: github.event_name != 'push'
