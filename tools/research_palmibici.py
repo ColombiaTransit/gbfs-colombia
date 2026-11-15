@@ -108,6 +108,24 @@ def main():
             print("  public URL references:", *matches[:60], sep="\n    ")
             routes = sorted(set(ROUTE_RE.findall(body)))
             print("  route candidate strings:", *routes[:60], sep="\n    ")
+            # Inspect only short string literals (paths and labels) associated
+            # with API and station terminology; no user data or auth calls.
+            interesting = ("estacion", "station", "bicicl", "disponib",
+                           "api", "baseurl", "endpoint", "palmibici")
+            tokens = set()
+            for m in re.finditer(r"""(["'])([^"'\\\n]{1,150})\1""", body):
+                candidate = m.group(2)
+                low = candidate.lower()
+                if any(word in low for word in interesting):
+                    if any(secret in low for secret in
+                           ("password", "token=", "secret", "bearer", "authorization")):
+                        continue
+                    if "?" in candidate:
+                        candidate = candidate.split("?", 1)[0]
+                    if len(candidate) <= 125 and all(ord(ch) >= 32 for ch in candidate):
+                        tokens.add(candidate)
+            print("  matching static string literals:", *sorted(tokens)[:90],
+                  sep="\n    ")
         except (TimeoutError, OSError, urllib.error.URLError) as exc:
             print("SCRIPT", scrub(url), "ERROR", type(exc).__name__, str(exc)[:150])
 
