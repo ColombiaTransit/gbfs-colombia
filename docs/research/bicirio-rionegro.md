@@ -1,0 +1,150 @@
+# BiciRio (Rionegro) — GBFS source investigation
+
+**State:** Research verified, public station API found; **do not enable live GBFS yet**  
+**Observed:** 2026-11-15 (Sunday), GitHub Actions runner  
+**Operator:** SOMOS Movilidad Rionegro S.A.S. / municipality of Rionegro, Antioquia, Colombia  
+**Candidate network tag:** `bicirio-rionegro` (not registered)  
+**Country:** CO; time zone: `America/Bogota`
+
+## Official sources
+
+- Operator system overview and FAQ:
+  https://somosmovilidad.gov.co/sistema-de-bicicletas-bicirio/
+- Operator questions and answers:
+  https://somosmovilidad.gov.co/preguntas-frecuentes/
+- Official public web application:
+  https://bicirio.somosmovilidad.gov.co/
+- Android app:
+  https://play.google.com/store/apps/details?id=co.gov.somosmovilidad.bicirio
+  (updated 2026-09-01)
+- iOS app:
+  https://apps.apple.com/co/app/bicirio/id6798346481
+- Operator 2024 management report (contains history of platform
+  migration and technical constraints):
+  https://somosmovilidad.gov.co/wp-content/uploads/2025/04/Informe_Gestion_Junta_Directiva.pdf
+
+The operator reports **18 public stations**, naming Palos Verdes, San
+Antonio, El Faro, Edificios, El Porvenir, La Cuarta, San Nicolás, Unidad
+Deportiva, Santa Ana, Plaza de la Libertad, San Francisco, Hospital,
+Cuatro Esquinas, Barro Blanco, Porvenir 50, Villa Camila, Quebrada
+Arriba and Zona Franca. The last two are virtual stations in the 2025
+expansion. The operator describes public station screens with capacity,
+available bicycles and available docks.
+
+Published operating hours (verify current changes before GBFS publication):
+- Monday–Friday: 06:00–18:00
+- Saturday: 06:00–16:00
+- Sunday: San Antonio-only 09:00–16:00, **temporarily suspended**
+- Zona Franca virtual: Monday–Friday 06:00–16:00
+
+## Verified public web application and data API
+
+The public Angular frontend loads as HTML and JavaScript from
+`bicirio.somosmovilidad.gov.co`. Its app bundle
+`main-YSAWJGXJ.js` and lazy module `chunk-LJOODKNY.js`
+were inspected without user accounts or credentials.
+
+JavaScript sets `baseUrl: "/api/v1"` and explicitly provides:
+- `GET /free_access/stations/get_all`
+- `GET /free_access/bicycles/get_all_by_station/{station_id}`
+- `GET /stations/public/get_all` (requires separate authentication
+  assessment; **not** probed)
+
+**Confirmed public read-only endpoint:**
+
+```text
+https://bicirio.somosmovilidad.gov.co/api/v1/free_access/stations/get_all
+```
+
+Response from GitHub Actions runner: HTTP 200, `application/json`,
+**18 station records** (~4,777 bytes) with fields:
+
+```text
+id, name, address, altitude, confirmed, connectionState,
+details, latitude, longitude, state, stationType
+```
+
+Second endpoint as implemented in the JS service:
+
+```text
+https://bicirio.somosmovilidad.gov.co/api/v1/free_access/bicycles/get_all_by_station/{id}
+```
+
+Read-only GET tests on 2026-11-15:
+
+| Station ID | Name | HTTP | Response |
+|---|---|---|---|
+| 37 | Palos Verdes | 200 | empty JSON array `[]` |
+| 21 | El Faro | 200 | empty JSON array `[]` |
+| 36 | San Antonio | 200 | empty JSON array `[]` |
+
+**Important:** empty responses do not establish permanently zero
+bicycles or a broken endpoint. Sunday service is restricted, and
+the provider may be offline. Recheck on an operating weekday before
+treating bicycle availability as reliable.
+
+### Data quality issues that block automatic publishing
+
+1. **Latitude/longitude inconsistent:** Most API records use latitude
+   for a longitude around -75.3 and longitude for a latitude around
+   +6.1. However, El Faro (ID 21) has conventional order:
+   `latitude=6.147648`, `longitude=-75.39029`.
+   The parser must validate **each record** against Rionegro's
+   geographic bounding box, correct swapped pairs and flag ambiguity.
+2. **Invalid location:** ID 40 named `Virtual` has lat/lon `0,0`;
+   do not publish this as a GBFS station without a verified location.
+3. **Internal station records:** ID 38 named `Bodega` has
+   `state=On_Maintenance` and is not on the operator's public 18-station
+   list; it may be a depot. Keep excluded pending confirmation.
+4. **Discrepancy:** The API's 18 records include `Virtual` and
+   `Bodega` but do **not** contain operator-listed **Quebrada Arriba**
+   or **Zona Franca**. It cannot be treated as a complete public
+   network roster yet.
+5. **Possible coordinate collisions:** La Cuarta (ID 31),
+   Porvenir 50 (ID 24), and El Faro (ID 21) resolve to the same
+   `6.147648, -75.39029` location after field correction.
+   Check each against an independently verified station position.
+6. **Unverified operational states:** 11 records report `Open`,
+   6 `Closed`, and 1 `On_Maintenance` in this single snapshot.
+   All 18 have `connectionState=false`. The semantic meanings and
+   freshness of these fields are not yet established; do not use
+   as `is_renting`/`is_returning` without further testing.
+7. **No verified real-time bicycle supply:** the three tested public
+   bicycle lists were empty. Do not invent available-bicycle counts or
+   set empty to zero in a public feed until runtime behavior is verified.
+
+### TLS / reliability blocker
+
+Normal HTTPS validation from the GitHub Actions runner produces
+`CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`
+for `bicirio.somosmovilidad.gov.co`.
+
+To conduct *public static-code research only*, the isolated
+`tools/research_bicirio.py` GitHub Actions job uses a narrowly scoped,
+explicit TLS-verification fallback on the exact BiciRio host, with
+**no account credentials** and **GETs to known public endpoints only**.
+Never carry this bypass into a production scraper. Fix the upstream
+certificate chain (or get a secure official endpoint) before
+publishing GBFS.
+
+Research job (station JSON and the three availability tests):
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/43748354326
+
+## Next milestone / acceptance conditions
+
+- [ ] Weekday verification: obtain a nonempty public bicycle response,
+      with public bicycle type/status fields sufficient to calculate
+      rentable station-level availability; otherwise determine if the
+      endpoint is empty by design or temporarily out of service
+- [ ] Confirm valid HTTPS certificate chain without bypass
+- [ ] Reconcile internal API station IDs and all 18 public stations;
+      exclude depot and 0,0 placeholders
+- [ ] Verify lat/lon order **per record** and independent coordinates for
+      ambiguous or duplicated sites
+- [ ] Establish interpretation and freshness of `state`,
+      `connectionState`, `confirmed` and station type
+- [ ] Verify permission/terms for publishing provider data
+- [ ] Only then implement `colombia_gbfs.scrapers.bicirio`, add
+      tests/GBFS validator checks and enable via `ENABLED_NETWORKS`
+
+**Do not run an automatic public GBFS feed yet.**
