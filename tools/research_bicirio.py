@@ -18,6 +18,7 @@ SITES = [
     "https://bicirio.somosmovilidad.gov.co/",
     "https://bicirio.somosmovilidad.gov.co/login",
     "https://bicirio.somosmovilidad.gov.co/register",
+    "https://bicirio.somosmovilidad.gov.co/stations",
     "https://somosmovilidad.gov.co/somos-mapa/leaflet-routing-machine-3.2.12/examples/index.html",
 ]
 DOMAINS = {"somosmovilidad.gov.co", "bicirio.somosmovilidad.gov.co"}
@@ -109,6 +110,25 @@ def summarize(url, content):
     print("  official URL references", candidates[:20])
     paths = sorted(set(ROUTE_PATTERN.findall(content)))
     print("  literal API/station path candidates", paths[:40])
+    if url.endswith(".js") and "bicirio.somosmovilidad.gov.co" in url:
+        hosts = set()
+        for match in URL_PATTERN.finditer(content):
+            parsed = urllib.parse.urlsplit(match.group().replace("\\/", "/"))
+            if parsed.scheme in ("http", "https") and parsed.hostname:
+                hosts.add(parsed.hostname)
+        print("  JS referenced hosts (not requested)", sorted(hosts)[:40])
+        for term in ("/stations", "API_URL", "apiUrl", "baseUrl", "baseURL",
+                     "api/", "http://", "https://", "estaciones", "bicicletas"):
+            hints = []
+            for found in list(re.finditer(re.escape(term), content, re.I))[:4]:
+                nearby = content[max(0, found.start()-90):found.end()+105]
+                # Strictly remove long possible API keys and all URI query data.
+                nearby = re.sub(r"[A-Za-z0-9_-]{30,}", "[redacted]", nearby)
+                nearby = re.sub(r"https?://[^\\s'\";]+", "[absolute URL]", nearby)
+                nearby = re.sub(r"\\s+", " ", nearby)
+                hints.append(nearby[:180])
+            if hints:
+                print("  JS code context", term, hints)
 
 
 def main():
