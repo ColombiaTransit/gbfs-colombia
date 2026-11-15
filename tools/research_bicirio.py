@@ -17,12 +17,8 @@ import urllib.request
 SITES = [
     "https://somosmovilidad.gov.co/sistema-de-bicicletas-bicirio/",
     "https://bicirio.somosmovilidad.gov.co/",
-    "https://bicirio.somosmovilidad.gov.co/login",
-    "https://bicirio.somosmovilidad.gov.co/register",
-    "https://bicirio.somosmovilidad.gov.co/stations",
-    # Explicit public routes present in the official frontend's no-auth list:
-    "https://bicirio.somosmovilidad.gov.co/free_access/stations/get_all",
-    "https://bicirio.somosmovilidad.gov.co/free_access/bicycles/get_all_by_station",
+    # Explicit GET route and baseUrl recovered from the public Angular bundle.
+    "https://bicirio.somosmovilidad.gov.co/api/v1/free_access/stations/get_all",
     "https://somosmovilidad.gov.co/somos-mapa/leaflet-routing-machine-3.2.12/examples/index.html",
 ]
 DOMAINS = {"somosmovilidad.gov.co", "bicirio.somosmovilidad.gov.co"}
@@ -164,6 +160,30 @@ def main():
                         print("  JSON array length", len(result),
                               "first record keys", sorted(result[0].keys())[:30]
                               if result and isinstance(result[0], dict) else [])
+                    def public_station_samples(items):
+                        if not isinstance(items, list):
+                            return
+                        safe_keys = ("id", "name", "nombre", "stationName", "address",
+                                     "latitude", "longitude", "lat", "lon", "lng",
+                                     "capacity", "bikeCount", "availableBikes",
+                                     "status", "type", "stationType")
+                        for record in items[:2]:
+                            if isinstance(record, dict):
+                                print("  PUBLIC STATION SAMPLE", {
+                                    k: record[k] for k in safe_keys if k in record
+                                    and isinstance(record[k], (int, float, str, bool))
+                                    and len(str(record[k])) < 180
+                                })
+                    if isinstance(result, list):
+                        public_station_samples(result)
+                    if isinstance(result, dict):
+                        for value in result.values():
+                            if isinstance(value, list):
+                                public_station_samples(value)
+                            elif isinstance(value, dict):
+                                print("  Nested object keys", sorted(value.keys())[:30])
+                                for nested in value.values():
+                                    public_station_samples(nested)
                     else:
                         print("  JSON value type", type(result).__name__)
                 except ValueError:
