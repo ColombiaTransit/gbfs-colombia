@@ -6,6 +6,8 @@ private APIs, arbitrary API brute-force, or per-user data are accessed.
 """
 from html.parser import HTMLParser
 import re
+import os
+import ssl
 import socket
 import urllib.error
 import urllib.parse
@@ -73,7 +75,22 @@ def get(url):
     if urllib.parse.urlsplit(url).hostname not in DOMAINS:
         raise ValueError("Only explicitly approved official public origins")
     request = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(request, timeout=12) as response:
+    try:
+        response = urllib.request.urlopen(request, timeout=12)
+    except urllib.error.URLError as exc:
+        # Public GET-only research workaround for the operator's broken
+        # certificate chain. Never use this for real requests, user input,
+        # authentication, production scrapers, or GBFS distribution.
+        host = urllib.parse.urlsplit(url).hostname
+        allow_research = os.getenv("BICIRIO_PUBLIC_RESEARCH_TLS_FALLBACK") == "1"
+        if not (allow_research and host == "bicirio.somosmovilidad.gov.co"
+                and "CERTIFICATE_VERIFY_FAILED" in str(exc)):
+            raise
+        print("  WARNING: cert verification failed; isolated PUBLIC-ASSET"
+              " research fallback only; response content is UNTRUSTED")
+        context = ssl._create_unverified_context()
+        response = urllib.request.urlopen(request, timeout=12, context=context)
+    with response:
         data = response.read(MAX_BYTES+1)
         if len(data) > MAX_BYTES:
             raise ValueError("public asset size limit exceeded")
@@ -118,6 +135,9 @@ def main():
                             seen_assets.add(src)
                             per_host[host] = per_host.get(host, 0) + 1
                 print("  discovered JS", len(h.assets))
+                print("  JS references", [display_safe(urllib.parse.urljoin(actual, v))
+                                          for v in h.assets if display_safe(
+                                          urllib.parse.urljoin(actual, v))][:25])
             summarize(url, body)
         except urllib.error.HTTPError as exc:
             print("PAGE", display_safe(url), "HTTP", exc.code)
