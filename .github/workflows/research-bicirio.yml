@@ -1,0 +1,26 @@
+name: Inspect BiciRio public website assets
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/research_bicirio.py"
+      - ".github/workflows/research-bicirio.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect public official website assets only
+        run: python tools/research_bicirio.py | tee bicirio-public-assets.txt
+      - name: Preserve public research summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: bicirio-public-assets
+          path: bicirio-public-assets.txt
+          retention-days: 7
