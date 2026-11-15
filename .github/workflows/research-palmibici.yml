@@ -1,0 +1,27 @@
+name: Inspect PalmiBici public PWA assets
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/research_palmibici.py"
+      - ".github/workflows/research-palmibici.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Examine only public site HTML and static scripts
+        run: |
+          python tools/research_palmibici.py | tee palmibici-public-asset-report.txt
+      - name: Upload research report
+        uses: actions/upload-artifact@v4
+        with:
+          name: palmibici-public-asset-report
+          path: palmibici-public-asset-report.txt
+          retention-days: 14
