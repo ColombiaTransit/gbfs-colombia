@@ -19,6 +19,8 @@ SITES = [
     "https://bicirio.somosmovilidad.gov.co/",
     # Explicit GET route and baseUrl recovered from the public Angular bundle.
     "https://bicirio.somosmovilidad.gov.co/api/v1/free_access/stations/get_all",
+    # Exact public bicycle route with the confirmed public station ID 37.
+    "https://bicirio.somosmovilidad.gov.co/api/v1/free_access/bicycles/get_all_by_station/37",
     "https://somosmovilidad.gov.co/somos-mapa/leaflet-routing-machine-3.2.12/examples/index.html",
 ]
 DOMAINS = {"somosmovilidad.gov.co", "bicirio.somosmovilidad.gov.co"}
@@ -176,6 +178,27 @@ def main():
                                 })
                     if isinstance(result, list):
                         public_station_samples(result)
+                        if "/stations/get_all" in url:
+                            print("  PUBLIC STATIONS (names, types, state, coordinates)")
+                            for item in result:
+                                if not isinstance(item, dict):
+                                    continue
+                                safe = {key: item[key] for key in
+                                        ("id", "name", "stationType", "state", "connectionState",
+                                         "confirmed", "latitude", "longitude")
+                                        if isinstance(item.get(key), (str, bool, int, float))}
+                                details = item.get("details")
+                                if isinstance(details, dict):
+                                    safe["details_field_names"] = sorted(details.keys())[:25]
+                                elif isinstance(details, list):
+                                    safe["details_array_length"] = len(details)
+                                print("   ", safe)
+                        elif "/bicycles/get_all_by_station/" in url and result:
+                            first = result[0]
+                            print("  BICYCLE SAMPLE FIELD TYPES", {
+                                key: type(value).__name__ for key, value in
+                                first.items() if isinstance(first, dict)
+                            } if isinstance(first, dict) else {})
                     if isinstance(result, dict):
                         for value in result.values():
                             if isinstance(value, list):
