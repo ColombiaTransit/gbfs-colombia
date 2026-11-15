@@ -21,6 +21,8 @@ SITES = [
     "https://bicirio.somosmovilidad.gov.co/api/v1/free_access/stations/get_all",
     # Exact public bicycle route with the confirmed public station ID 37.
     "https://bicirio.somosmovilidad.gov.co/api/v1/free_access/bicycles/get_all_by_station/37",
+    "https://bicirio.somosmovilidad.gov.co/api/v1/free_access/bicycles/get_all_by_station/21",
+    "https://bicirio.somosmovilidad.gov.co/api/v1/free_access/bicycles/get_all_by_station/36",
     "https://somosmovilidad.gov.co/somos-mapa/leaflet-routing-machine-3.2.12/examples/index.html",
 ]
 DOMAINS = {"somosmovilidad.gov.co", "bicirio.somosmovilidad.gov.co"}
