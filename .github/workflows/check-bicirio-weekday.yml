@@ -1,0 +1,39 @@
+name: Check BiciRio on Monday 16 November
+
+on:
+  schedule:
+    # 2026-11-16 09:00 Colombia (UTC-5) = 14:00 UTC
+    - cron: "0 14 16 11 *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-bicirio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Guard against future yearly runs
+        id: date
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" && "$(TZ=America/Bogota date +%F)" != "2026-11-16" ]]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "One-off date has passed; skipping."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.date.outputs.run == 'true'
+      - name: Check official public BiciRio APIs
+        if: steps.date.outputs.run == 'true'
+        run: python tools/check_bicirio_weekday.py --output bicirio-weekday-report.json
+      - name: Upload research report, including empty/error results
+        if: always() && steps.date.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bicirio-2026-11-16
+          path: bicirio-weekday-report.json
+          if-no-files-found: warn
+          retention-days: 7
