@@ -39,7 +39,7 @@ jobs:
           images: ghcr.io/colombiatransit/gbfs-colombia
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,prefix=sha-
+            type=sha,prefix=sha-,format=long
             type=ref,event=tag
 
       - name: Build, test and publish
@@ -51,3 +51,36 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Smoke test Docker Compose runtime
+        if: github.event_name != 'pull_request'
+        env:
+          GBFS_IMAGE: ghcr.io/colombiatransit/gbfs-colombia:sha-${{ github.sha }}
+        run: |
+          docker compose pull
+          docker compose up -d
+          for attempt in $(seq 1 30); do
+            if curl --silent --show-error --fail http://127.0.0.1:8000/healthz; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error http://127.0.0.1:8000/healthz
+          for service in publisher subscriber api; do
+            container_id=$(docker compose ps -q "$service")
+            test -n "$container_id"
+            test "$(docker inspect -f '{{.State.Running}}' "$container_id")" = "true"
+          done
+          docker compose ps
+
+      - name: Show Compose logs on failure
+        if: failure() && github.event_name != 'pull_request'
+        env:
+          GBFS_IMAGE: ghcr.io/colombiatransit/gbfs-colombia:sha-${{ github.sha }}
+        run: docker compose logs --tail 80
+
+      - name: Stop smoke test containers
+        if: always() && github.event_name != 'pull_request'
+        env:
+          GBFS_IMAGE: ghcr.io/colombiatransit/gbfs-colombia:sha-${{ github.sha }}
+        run: docker compose down -v
