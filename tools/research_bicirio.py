@@ -121,10 +121,12 @@ def summarize(url, content):
             if parsed.scheme in ("http", "https") and parsed.hostname:
                 hosts.add(parsed.hostname)
         print("  JS referenced hosts (not requested)", sorted(hosts)[:40])
-        for term in ("/stations", "API_URL", "apiUrl", "baseUrl", "baseURL",
-                     "api/", "http://", "https://", "estaciones", "bicicletas"):
+        for term in ("/stations", "free_access", "get_all_by_station",
+                     "stations/get_all", "api", "base", "environment",
+                     "API_URL", "apiUrl", "baseUrl", "baseURL", "backend",
+                     "http://", "https://", "estaciones", "bicicletas"):
             hints = []
-            for found in list(re.finditer(re.escape(term), content, re.I))[:4]:
+            for found in list(re.finditer(re.escape(term), content, re.I))[:7]:
                 nearby = content[max(0, found.start()-90):found.end()+105]
                 # Strictly remove long possible API keys and all URI query data.
                 nearby = re.sub(r"[A-Za-z0-9_-]{30,}", "[redacted]", nearby)
