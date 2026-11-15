@@ -1,0 +1,68 @@
+name: gbfs-colombia
+
+x-image: &gbfs-image ${GBFS_IMAGE:-ghcr.io/colombiatransit/gbfs-colombia:latest}
+
+services:
+  migrate:
+    image: *gbfs-image
+    command: ["python", "-m", "citybikes.cmd.migrate"]
+    environment:
+      DB_URI: /data/citybikes.db
+    volumes:
+      - gbfs-data:/data
+    restart: "no"
+
+  publisher:
+    image: *gbfs-image
+    command: ["python", "-m", "colombia_gbfs.publisher"]
+    environment:
+      ENABLED_NETWORKS: ${ENABLED_NETWORKS:-encicla,tembici-bogota}
+      UPDATE_INTERVAL_SECONDS: ${UPDATE_INTERVAL_SECONDS:-180}
+      ZMQ_LISTEN: tcp://0.0.0.0:5555
+      N_WORKERS_PYBIKES: "4"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+
+  subscriber:
+    image: *gbfs-image
+    command: ["python", "-m", "citybikes.cmd.subscriber"]
+    environment:
+      DB_URI: /data/citybikes.db
+      ZMQ_ADDR: tcp://publisher:5555
+    volumes:
+      - gbfs-data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      publisher:
+        condition: service_started
+    restart: unless-stopped
+
+  api:
+    image: *gbfs-image
+    environment:
+      DB_URI: /data/citybikes.db
+      ENABLED_NETWORKS: ${ENABLED_NETWORKS:-encicla,tembici-bogota}
+      GBFS_CONTACT_EMAIL: ${GBFS_CONTACT_EMAIL:-}
+    ports:
+      - "${GBFS_BIND_IP:-127.0.0.1}:${GBFS_PORT:-8000}:8000"
+    volumes:
+      - gbfs-data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  gbfs-data:
