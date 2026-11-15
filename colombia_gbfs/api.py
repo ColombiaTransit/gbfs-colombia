@@ -30,13 +30,25 @@ class ColombiaGbfs3(UpstreamGbfs3):
         return restricted
 
     async def system_information(self, request, db, uid):
+        contact = os.getenv("GBFS_CONTACT_EMAIL", "").strip()
+        if not contact or "@" not in contact:
+            raise HTTPException(
+                status_code=503,
+                detail="Set GBFS_CONTACT_EMAIL to a monitored address before publishing GBFS",
+            )
         info = await super().system_information(request, db, uid)
+        hours_key = "GBFS_OPENING_HOURS_" + uid.upper().replace("-", "_")
+        hours = (os.getenv(hours_key)
+                 or os.getenv("GBFS_OPENING_HOURS")
+                 or "24/7 unknown")
+        # OSM opening_hours 'unknown' explicitly conveys that hours have
+        # not yet been verified; it must not be mistaken for 24/7 service.
         # Do not claim ColombiaTransit operates the bicycles. The operator
-        # field retains its upstream provider identity.
+        # field retains the original provider identity.
         return info.model_copy(update={
             "timezone": "America/Bogota",
-            "opening_hours": None,  # Not known; do not claim a closed system.
-            "feed_contact_email": os.getenv("GBFS_CONTACT_EMAIL") or None,
+            "opening_hours": hours,
+            "feed_contact_email": contact,
             "attribution_organization_name": "ColombiaTransit",
             "attribution_url": "https://github.com/ColombiaTransit/gbfs-colombia",
         })

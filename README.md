@@ -28,6 +28,7 @@ The database persists in the `gbfs-data` named Docker volume.
 git clone https://github.com/ColombiaTransit/gbfs-colombia.git
 cd gbfs-colombia
 cp .env.example .env
+# Edit .env: set GBFS_CONTACT_EMAIL to a monitored address.
 docker compose pull
 docker compose up -d
 docker compose ps
@@ -43,6 +44,13 @@ Once live provider updates have arrived, use:
 **Data freshness is not guaranteed by the health endpoint.** Check
 `last_updated`, provider availability, and logs before advertising feeds.
 The initial GBFS outputs depend on the live upstream endpoints being reachable.
+GBFS 3.0 requires a monitored `feed_contact_email` and
+`opening_hours`. Until `GBFS_CONTACT_EMAIL` is provided,
+`system_information.json` returns HTTP 503 instead of inventing a contact.
+The initial `24/7 unknown` opening_hours expression explicitly indicates
+unverified hours; replace it with verified OSM opening_hours values per
+network using `GBFS_OPENING_HOURS_ENCICLA` or
+`GBFS_OPENING_HOURS_TEMBICI_BOGOTA`.
 Changes to `.env` take effect after `docker compose up -d`.
 
 To access the API from another host, set `GBFS_BIND_IP=0.0.0.0` and
