@@ -148,3 +148,21 @@ https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/43748354326
       tests/GBFS validator checks and enable via `ENABLED_NETWORKS`
 
 **Do not run an automatic public GBFS feed yet.**
+
+## One-time weekday retest (2026-11-16)
+
+GitHub Actions workflow:
+https://github.com/ColombiaTransit/gbfs-colombia/actions/workflows/bicirio-weekday-check.yml
+
+- Target: Monday 2026-11-16 at 09:15 in Colombia (14:15 UTC, 15:15 CET).
+- Tests only publicly documented BiciRio free_access GET endpoints.
+- Fetches station roster and up to 12 open, geolocated, non-depot stations.
+- Counts bicycle records without recording per-bike identifiers or rider data.
+- Reports station names and IDs, coordinate orientation, and whether TLS validation succeeded.
+- Reports empty bicycle responses as a failed run, while preserving the JSON artifact.
+- Artifact: bicirio-weekday-2026-11-16 (7-day retention).
+- After the scheduled execution, the workflow disables itself to prevent annual recurrence.
+- GitHub Actions scheduling is best-effort: execution may be delayed or missed.
+
+Even a nonempty response is not sufficient for production GBFS: bike status,
+operator station-list discrepancies and a valid HTTPS certificate still need verification.
