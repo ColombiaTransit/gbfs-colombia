@@ -13,8 +13,9 @@ import urllib.request
 PAGES = (
     "https://flotu.com/",
     "https://flotu.com/alquiler-vehiculos",
+    "https://app.flotu.com/",
 )
-HOSTS = {"flotu.com", "www.flotu.com"}
+HOSTS = {"flotu.com", "www.flotu.com", "app.flotu.com"}
 HEADERS = {"User-Agent": "ColombiaTransit-GBFS-Research/1.0",
            "Accept": "text/html,application/javascript,*/*"}
 MAX_DOWNLOAD = 3_000_000
