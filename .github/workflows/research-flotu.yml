@@ -1,0 +1,26 @@
+name: Inspect Flotu public website assets
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/research_flotu.py"
+      - ".github/workflows/research-flotu.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect public HTML and same-origin JS (no private API requests)
+        run: python tools/research_flotu.py | tee flotu-public-assets.txt
+      - name: Save investigation output
+        uses: actions/upload-artifact@v4
+        with:
+          name: flotu-public-assets
+          path: flotu-public-assets.txt
+          retention-days: 7
