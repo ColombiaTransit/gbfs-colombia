@@ -68,13 +68,22 @@ jobs:
         run: |
           docker compose pull
           docker compose up -d
+          # Probe from a separate container on the shared network: no host ports.
+          probe() {
+            docker run --rm \
+              --network "${GBFS_SHARED_NETWORK:-gbfs-colombia-shared}" \
+              --entrypoint python "$GBFS_IMAGE" \
+              -c 'import urllib.request; urllib.request.urlopen("http://gbfs-colombia:8000/healthz", timeout=3)'
+          }
           for attempt in $(seq 1 30); do
-            if curl --silent --show-error --fail http://127.0.0.1:8000/healthz; then
+            if probe; then
               break
             fi
             sleep 2
           done
-          curl --fail --silent --show-error http://127.0.0.1:8000/healthz
+          probe
+          # Enforce that Docker has not bound any API port on the host.
+          test "$(docker inspect -f '{{len .HostConfig.PortBindings}}' "$(docker compose ps -q api)")" = "0"
           for service in publisher subscriber api; do
             container_id=$(docker compose ps -q "$service")
             test -n "$container_id"

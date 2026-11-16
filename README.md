@@ -18,9 +18,14 @@ One GHCR image, four Compose services:
 - `api`: serves GBFS **3.0**; only enabled network IDs are exposed.
 - `migrate`: a one-shot database initialization/migration job.
 
-The Docker network does **not** publish ZeroMQ publicly. The GBFS API binds
-to `127.0.0.1:8000` by default, ready for an HTTPS reverse proxy.
-The database persists in the `gbfs-data` named Docker volume.
+No container publishes TCP ports on the Docker host. The `publisher`,
+`subscriber`, and `migrate` services communicate only on their Compose
+backend network. The `api` joins the predictably named bridge network
+`gbfs-colombia-shared`, where it is reachable as `http://gbfs-colombia:8000`.
+The `publisher` can still reach the upstream providers over the internet.
+Traefik and OpenTripPlanner (OTP) can join this shared network from their
+own Compose projects without conflicting with host ports. The database
+persists in the `gbfs-data` named Docker volume.
 
 ## Quick start
 
@@ -34,12 +39,55 @@ docker compose up -d
 docker compose ps
 ```
 
-Once live provider updates have arrived, use:
+Once live provider updates have arrived, **from a container on the shared
+Docker network** use:
 
-- `http://localhost:8000/3/manifest.json`
-- `http://localhost:8000/3/encicla/gbfs.json`
-- `http://localhost:8000/3/tembici-bogota/gbfs.json`
-- `http://localhost:8000/healthz` (API liveness only)
+- `http://gbfs-colombia:8000/3/manifest.json`
+- `http://gbfs-colombia:8000/3/encicla/gbfs.json`
+- `http://gbfs-colombia:8000/3/tembici-bogota/gbfs.json`
+- `http://gbfs-colombia:8000/healthz` (API liveness only)
+
+The host cannot access these URLs directly without joining the Docker
+network or going through Traefik. To check liveness on the server:
+
+```sh
+docker compose exec -T api python -c 'import urllib.request; print(urllib.request.urlopen("http://127.0.0.1:8000/healthz").read().decode())'
+```
+
+### Traefik and OTP connectivity
+
+This Compose stack automatically creates a shared bridge network named
+`gbfs-colombia-shared`. In **each separate Traefik or OTP Compose project**
+that must access the API, attach its service to that network, declaring:
+
+```yaml
+services:
+  # Example: merge this into your existing Traefik or OTP service.
+  otp:
+    networks:
+      - gbfs-shared
+
+networks:
+  gbfs-shared:
+    external: true
+    name: gbfs-colombia-shared
+```
+
+The example service name `otp` is illustrative; use your real service name.
+The network must already exist, so start the GBFS stack first. To reuse a
+name other than `gbfs-colombia-shared`, set `GBFS_SHARED_NETWORK` in
+`.env`, and use the same name for the other Compose projects.
+
+**Traefik routing is disabled by default** (`GBFS_TRAEFIK_ENABLED=false`).
+Once Traefik has joined the shared network, set
+`GBFS_TRAEFIK_HOST` to your public DNS hostname,
+`GBFS_TRAEFIK_ENTRYPOINT` to its HTTPS entrypoint (default `websecure`),
+and `GBFS_TRAEFIK_ENABLED=true`. Then run `docker compose up -d` to
+apply the new labels. Traefik discovers port `8000` over the shared network,
+not a host port. Ensure HTTPS and certificates are configured on Traefik.
+
+OTP can fetch EnCicla and Tembici GBFS directly using the two URLs above.
+The exact updater configuration depends on your OTP version.
 
 **Data freshness is not guaranteed by the health endpoint.** Check
 `last_updated`, provider availability, and logs before advertising feeds.
@@ -53,10 +101,11 @@ network using `GBFS_OPENING_HOURS_ENCICLA` or
 `GBFS_OPENING_HOURS_TEMBICI_BOGOTA`.
 Changes to `.env` take effect after `docker compose up -d`.
 
-To access the API from another host, set `GBFS_BIND_IP=0.0.0.0` and
-place it behind an appropriate firewall or HTTPS reverse proxy.
-Generated feed URLs use the incoming request host/scheme; configure your
-reverse proxy to forward the correct Host and HTTPS headers.
+For external clients, use Traefik with HTTPS; the Docker host does not
+publish a GBFS API port. Generated feed URLs use the incoming request
+host/scheme, so forward the appropriate Host and HTTPS headers from Traefik.
+For OTP, ensure it can resolve and reach the network alias and every URL
+linked inside the GBFS discovery feed.
 
 ## Image and releases
 

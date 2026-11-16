@@ -10,6 +10,10 @@ services:
       DB_URI: /data/citybikes.db
     volumes:
       - gbfs-data:/data
+    networks:
+      - backend
+    labels:
+      traefik.enable: "false"
     restart: "no"
 
   publisher:
@@ -20,6 +24,10 @@ services:
       UPDATE_INTERVAL_SECONDS: ${UPDATE_INTERVAL_SECONDS:-180}
       ZMQ_LISTEN: tcp://0.0.0.0:5555
       N_WORKERS_PYBIKES: "4"
+    networks:
+      - backend
+    labels:
+      traefik.enable: "false"
     read_only: true
     tmpfs:
       - /tmp
@@ -38,6 +46,10 @@ services:
         condition: service_completed_successfully
       publisher:
         condition: service_started
+    networks:
+      - backend
+    labels:
+      traefik.enable: "false"
     restart: unless-stopped
 
   api:
@@ -49,8 +61,21 @@ services:
       GBFS_OPENING_HOURS: "${GBFS_OPENING_HOURS:-24/7 unknown}"
       GBFS_OPENING_HOURS_ENCICLA: "${GBFS_OPENING_HOURS_ENCICLA:-}"
       GBFS_OPENING_HOURS_TEMBICI_BOGOTA: "${GBFS_OPENING_HOURS_TEMBICI_BOGOTA:-}"
-    ports:
-      - "${GBFS_BIND_IP:-127.0.0.1}:${GBFS_PORT:-8000}:8000"
+    # No host port is published. Traefik and OTP use the shared Docker network.
+    expose:
+      - "8000"
+    networks:
+      shared:
+        aliases:
+          - gbfs-colombia
+    labels:
+      traefik.enable: "${GBFS_TRAEFIK_ENABLED:-false}"
+      traefik.docker.network: "${GBFS_SHARED_NETWORK:-gbfs-colombia-shared}"
+      traefik.http.routers.gbfs-colombia.rule: "Host(`${GBFS_TRAEFIK_HOST:-gbfs.invalid}`)"
+      traefik.http.routers.gbfs-colombia.entrypoints: "${GBFS_TRAEFIK_ENTRYPOINT:-websecure}"
+      traefik.http.routers.gbfs-colombia.tls: "true"
+      traefik.http.routers.gbfs-colombia.service: "gbfs-colombia"
+      traefik.http.services.gbfs-colombia.loadbalancer.server.port: "8000"
     volumes:
       - gbfs-data:/data
     depends_on:
@@ -66,6 +91,14 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+# The backend network stays private to this Compose project. Do not mark it
+# internal: publisher needs outbound access to the original bike providers.
+networks:
+  backend:
+  shared:
+    # Predictable name so other Compose projects can attach as external.
+    name: ${GBFS_SHARED_NETWORK:-gbfs-colombia-shared}
 
 volumes:
   gbfs-data:
