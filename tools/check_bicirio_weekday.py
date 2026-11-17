@@ -108,12 +108,13 @@ def public_request(url):
 
 def run_check(fetch=public_request, pause=time.sleep):
     now = datetime.now(timezone.utc)
+    local_now = now.astimezone(ZoneInfo("America/Bogota"))
     report = {
         "project": "BiciRio",
         "purpose": "One-time workday public bicycle availability check",
         "timestamp_utc": now.isoformat(timespec="seconds"),
-        "timestamp_colombia": now.astimezone(
-            ZoneInfo("America/Bogota")).isoformat(timespec="seconds"),
+        "timestamp_colombia": local_now.isoformat(timespec="seconds"),
+        "within_research_window_08_12_colombia": 8 <= local_now.hour < 12,
         "station_source": STATIONS,
         "bike_source_pattern": BIKES + "{station_id}",
         "api_station_records": None,
@@ -155,6 +156,12 @@ def run_check(fetch=public_request, pause=time.sleep):
         report["error"] = str(exc)[:200]
         return report
 
+    if not report["within_research_window_08_12_colombia"]:
+        report["notes"].append(
+            "Run executed outside the intended 08:00-12:00 Colombia research window; "
+            "empty counts may reflect service hours, not missing inventory"
+        )
+
     for st in eligible:
         sid = str(st["id"])
         row = {
@@ -183,14 +190,27 @@ def run_check(fetch=public_request, pause=time.sleep):
         report["tested_stations"].append(row)
         pause(0.6)
 
-    if report["stations_with_nonempty_bicycle_response"] > 0:
+    failures = sum("error_type" in row for row in report["tested_stations"])
+    report["stations_with_bicycle_api_errors"] = failures
+    if failures:
+        report["result"] = "partial_bicycle_api_errors" if (
+            failures < len(report["tested_stations"])
+        ) else "bicycle_api_errors"
+    elif report["stations_with_nonempty_bicycle_response"] > 0:
         report["result"] = "nonempty_bicycle_responses"
-    elif all(row["bike_record_count"] is None
-             for row in report["tested_stations"]):
-        report["result"] = "bicycle_api_errors"
     else:
         report["result"] = "no_nonempty_bicycle_responses"
     return report
+
+
+def exit_status(report):
+    """Empty, valid JSON is an observation, not a CI failure.
+
+    Real API/transport/response-schema failures still fail the Action.
+    """
+    return 0 if report["result"] in {
+        "nonempty_bicycle_responses", "no_nonempty_bicycle_responses"
+    } else 1
 
 
 def main():
@@ -209,8 +229,13 @@ def main():
     print("Total bicycle records (not proven available):",
           report["total_bicycle_records"])
     print("TLS fully verified:", report["tls_verified_for_all_requests"])
+    print("Executed within 08:00-12:00 Colombia research window:",
+          report["within_research_window_08_12_colombia"])
+    if report["result"] == "no_nonempty_bicycle_responses":
+        print("OBSERVATION: all checked API responses were valid but empty; "
+              "this does not imply zero rentable bicycles or a failed Action.")
     print("Saved report:", args.output)
-    return 0 if report["result"] == "nonempty_bicycle_responses" else 1
+    return exit_status(report)
 
 
 if __name__ == "__main__":

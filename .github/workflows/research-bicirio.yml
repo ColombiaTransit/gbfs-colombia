@@ -1,10 +1,7 @@
 name: Inspect BiciRio public website assets
 
 on:
-  # One-time weekday availability check: 2026-11-16 09:00 America/Bogota.
-  # GitHub cron uses UTC (14:00 UTC). The job date guard prevents annual reruns.
-  schedule:
-    - cron: "0 14 16 11 *"
+  # The one-time scheduled run finished on 2026-11-16; research is now manual.
   workflow_dispatch:
   push:
     paths:

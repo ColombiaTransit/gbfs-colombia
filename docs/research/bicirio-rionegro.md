@@ -159,10 +159,41 @@ https://github.com/ColombiaTransit/gbfs-colombia/actions/workflows/bicirio-weekd
 - Fetches station roster and up to 12 open, geolocated, non-depot stations.
 - Counts bicycle records without recording per-bike identifiers or rider data.
 - Reports station names and IDs, coordinate orientation, and whether TLS validation succeeded.
-- Reports empty bicycle responses as a failed run, while preserving the JSON artifact.
+- Formerly reported empty bicycle responses as failed runs; fixed on 2026-11-17. Valid empty JSON is now an observation (successful test) while actual API/network failures still fail.
 - Artifact: bicirio-weekday-2026-11-16 (7-day retention).
 - After the scheduled execution, the workflow disables itself to prevent annual recurrence.
 - GitHub Actions scheduling is best-effort: execution may be delayed or missed.
 
 Even a nonempty response is not sufficient for production GBFS: bike status,
 operator station-list discrepancies and a valid HTTPS certificate still need verification.
+
+## Results of 2026-11-16 scheduled checks (reviewed 2026-11-17)
+
+The intended target was 09:00–09:15 Colombia. GitHub executed the
+two redundant scheduled checks **much later**, at 18:08 and 18:24
+Colombia time (23:08 and 23:24 UTC). Therefore the test **did not
+verify daytime bike availability**.
+
+- https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/43976555952
+- https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/43978970535
+- Both runs fetched **18 station records** and checked **12 eligible stations**.
+- **Zero nonempty bicycle responses**, **zero bicycle records**.
+- BiciRio's TLS chain was **not verifiable** in the research environment;
+  the narrowly scoped research-only fallback was needed.
+- Reports were successfully stored as artifacts despite the jobs
+  finishing with exit code 1, because the script had incorrectly
+  treated any valid empty bicycle response as a CI failure.
+- This is a **data-availability uncertainty**, not evidence that
+  the Docker container build or GHCR publication is broken.
+- The separate official-site research run
+  https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/43976187120
+  succeeded; the latest container publish run
+  https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/43870811435
+  also succeeded.
+
+**Remediation:** Consolidated BiciRio availability checks into one
+manual workflow `.github/workflows/bicirio-availability.yml` and
+removed obsolete duplicate one-time schedules. An empty but otherwise
+valid public result no longer sends false failure notifications;
+actual upstream API or parse errors still fail. The public
+station/script research workflow remains manual.

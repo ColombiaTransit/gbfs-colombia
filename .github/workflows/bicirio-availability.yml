@@ -1,0 +1,35 @@
+name: Check BiciRio public availability (manual)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/check_bicirio_weekday.py"
+      - "tools/tests/test_bicirio_weekday.py"
+      - ".github/workflows/bicirio-availability.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Validate check script (offline tests)
+        run: |
+          python -m compileall -q tools/check_bicirio_weekday.py
+          python -m unittest discover -s tools/tests -p 'test_bicirio_weekday.py' -v
+      - name: Inspect BiciRio public station and bicycle availability
+        if: github.event_name == 'workflow_dispatch'
+        run: python tools/check_bicirio_weekday.py --output bicirio-availability-report.json
+      - name: Store report including valid empty API responses
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bicirio-availability-report
+          path: bicirio-availability-report.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,7 +1,7 @@
 """Offline unit tests; they never contact BiciRio."""
 import unittest
 from tools.check_bicirio_weekday import (
-    BIKES, STATIONS, as_records, coordinate_status, run_check, select_stations
+    BIKES, STATIONS, as_records, coordinate_status, exit_status, run_check, select_stations
 )
 
 
@@ -66,6 +66,25 @@ class TestBiciRioWeekday(unittest.TestCase):
         report = run_check(fetch=fake_fetch, pause=lambda _: None)
         self.assertEqual(report["result"], "no_nonempty_bicycle_responses")
         self.assertEqual(report["total_bicycle_records"], 0)
+        self.assertEqual(exit_status(report), 0)
+
+    def test_actual_api_failure_is_a_failure(self):
+        def fake_fetch(url):
+            if url == STATIONS:
+                return self.stations, True
+            raise OSError("Simulated upstream HTTP failure")
+
+        report = run_check(fetch=fake_fetch, pause=lambda _: None)
+        self.assertEqual(report["result"], "bicycle_api_errors")
+        self.assertEqual(exit_status(report), 1)
+
+    def test_station_api_error_is_a_failure(self):
+        def fake_fetch(url):
+            raise OSError("Simulated station API failure")
+
+        report = run_check(fetch=fake_fetch, pause=lambda _: None)
+        self.assertEqual(report["result"], "station_api_error")
+        self.assertEqual(exit_status(report), 1)
 
 
 if __name__ == "__main__":
