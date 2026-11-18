@@ -20,11 +20,10 @@ One GHCR image, four Compose services:
 
 No container publishes TCP ports on the Docker host. The `publisher`,
 `subscriber`, and `migrate` services communicate only on their Compose
-backend network. The `api` joins the predictably named bridge network
-`gbfs-colombia-shared`, where it is reachable as `http://gbfs-colombia:8000`.
-The `publisher` can still reach the upstream providers over the internet.
-Traefik and OpenTripPlanner (OTP) can join this shared network from their
-own Compose projects without conflicting with host ports. The database
+backend network. The `api` additionally joins the existing external
+Docker network `traefik_default`, where it is reachable as
+`http://gbfs-colombia:8000`. The `publisher` can still reach the upstream
+providers over the internet. The database
 persists in the `gbfs-data` named Docker volume.
 
 ## Quick start
@@ -34,60 +33,39 @@ git clone https://github.com/ColombiaTransit/gbfs-colombia.git
 cd gbfs-colombia
 cp .env.example .env
 # Edit .env: set GBFS_CONTACT_EMAIL to a monitored address.
+docker network inspect traefik_default >/dev/null  # must already exist
 docker compose pull
 docker compose up -d
 docker compose ps
 ```
 
-Once live provider updates have arrived, **from a container on the shared
-Docker network** use:
+Once live provider updates have arrived, **from a container on the
+`traefik_default` network** use:
 
 - `http://gbfs-colombia:8000/3/manifest.json`
 - `http://gbfs-colombia:8000/3/encicla/gbfs.json`
 - `http://gbfs-colombia:8000/3/tembici-bogota/gbfs.json`
 - `http://gbfs-colombia:8000/healthz` (API liveness only)
 
-The host cannot access these URLs directly without joining the Docker
-network or going through Traefik. To check liveness on the server:
+The host cannot access these URLs directly. To check liveness on the server:
 
 ```sh
 docker compose exec -T api python -c 'import urllib.request; print(urllib.request.urlopen("http://127.0.0.1:8000/healthz").read().decode())'
 ```
 
-### Traefik and OTP connectivity
+### Network
 
-This Compose stack automatically creates a shared bridge network named
-`gbfs-colombia-shared`. In **each separate Traefik or OTP Compose project**
-that must access the API, attach its service to that network, declaring:
+The `api` service joins the external network `traefik_default`, which
+this stack neither creates nor removes; `docker compose up` fails if it
+does not exist. Any container on that network (for example OTP) reaches
+the API as `http://gbfs-colombia:8000`. To use a different existing
+network, set `GBFS_SHARED_NETWORK` in `.env`.
 
-```yaml
-services:
-  # Example: merge this into your existing Traefik or OTP service.
-  otp:
-    networks:
-      - gbfs-shared
-
-networks:
-  gbfs-shared:
-    external: true
-    name: gbfs-colombia-shared
-```
-
-The example service name `otp` is illustrative; use your real service name.
-The network must already exist, so start the GBFS stack first. To reuse a
-name other than `gbfs-colombia-shared`, set `GBFS_SHARED_NETWORK` in
-`.env`, and use the same name for the other Compose projects.
-
-**Traefik routing is disabled by default** (`GBFS_TRAEFIK_ENABLED=false`).
-Once Traefik has joined the shared network, set
-`GBFS_TRAEFIK_HOST` to your public DNS hostname,
-`GBFS_TRAEFIK_ENTRYPOINT` to its HTTPS entrypoint (default `websecure`),
-and `GBFS_TRAEFIK_ENABLED=true`. Then run `docker compose up -d` to
-apply the new labels. Traefik discovers port `8000` over the shared network,
-not a host port. Ensure HTTPS and certificates are configured on Traefik.
-
-OTP can fetch EnCicla and Tembici GBFS directly using the two URLs above.
-The exact updater configuration depends on your OTP version.
+No reverse-proxy routing is configured: the API is not exposed publicly.
+Generated feed URLs use the host and scheme of the incoming request, so
+OTP sees `http://gbfs-colombia:8000/...` URLs, which it can reach on the
+same network. The exact OTP updater configuration depends on your OTP
+version.
 
 **Data freshness is not guaranteed by the health endpoint.** Check
 `last_updated`, provider availability, and logs before advertising feeds.
@@ -97,15 +75,12 @@ GBFS 3.0 requires a monitored `feed_contact_email` and
 `system_information.json` returns HTTP 503 instead of inventing a contact.
 The initial `24/7 unknown` opening_hours expression explicitly indicates
 unverified hours; replace it with verified OSM opening_hours values per
-network using `GBFS_OPENING_HOURS_ENCICLA` or
-`GBFS_OPENING_HOURS_TEMBICI_BOGOTA`.
+network using `GBFS_OPENING_HOURS_<TAG>` (tag upper-cased, `-` replaced
+by `_`), e.g. `GBFS_OPENING_HOURS_ENCICLA` or
+`GBFS_OPENING_HOURS_TEMBICI_BOGOTA`. The `api` and `publisher` services
+read `.env` directly, so these work for any enabled network without
+editing `compose.yaml`.
 Changes to `.env` take effect after `docker compose up -d`.
-
-For external clients, use Traefik with HTTPS; the Docker host does not
-publish a GBFS API port. Generated feed URLs use the incoming request
-host/scheme, so forward the appropriate Host and HTTPS headers from Traefik.
-For OTP, ensure it can resolve and reach the network alias and every URL
-linked inside the GBFS discovery feed.
 
 ## Image and releases
 
@@ -116,8 +91,9 @@ ghcr.io/colombiatransit/gbfs-colombia:latest
 ```
 
 The GitHub Actions workflow builds and tests the image on push and
-publishes it to GHCR from `main` and `v*` tags. It also publishes
-`sha-...` tags. Pin a version tag or digest for reproducible deployments.
+publishes it to GHCR from `main` and `v*` tags. It first pushes an
+immutable `sha-...` tag, runs a Compose smoke test against it, and only
+then promotes it to `latest` or the version tag. Pin a version tag or digest for reproducible deployments.
 If the package is not public initially, set its GHCR package visibility to
 **Public** in the GitHub organization's package settings.
 
@@ -150,7 +126,7 @@ docker compose up -d
       "country": "CO",
       "latitude": 3.4516,
       "longitude": -76.5320,
-      "company": []
+      "company": ["Operator name"]
     }
   }
 ]
@@ -160,7 +136,12 @@ This JSON is an **example configuration**, not a claim that this bike
 sharing system or provider exists. Never enable the example until you
 have implemented and tested a real data source.
 
-4. Add `cali-bikes` to `ENABLED_NETWORKS` in `.env`.
+   `meta.company` is required and must be a list of operator names
+   (use `[]` if unknown). The tag must not reuse an upstream PyBikes
+   tag such as `encicla`; collisions are rejected at startup.
+4. Add `cali-bikes` to `ENABLED_NETWORKS` in `.env`. Optionally set
+   `GBFS_OPENING_HOURS_CALI_BIKES`. If the adapter sets `authed = True`,
+   provide its key as `PYBIKES_COLOMBIA_CALI_BIKES` in `.env`.
 5. Commit the changes so GitHub Actions builds a new image, then deploy
    that image and restart the stack. New Python modules are bundled into
    the image; editing a running container is not required.
@@ -168,7 +149,7 @@ have implemented and tested a real data source.
 The adapter registry is deliberately restricted to modules within
 `colombia_gbfs.scrapers`. At startup the code verifies that the
 network is registered, the adapter subclasses `BikeShareSystem`, and
-its metadata declares `country: CO`. Unregistered or foreign network
+its metadata declares `country: CO` and a `company` list. Unregistered or foreign network
 tags fail fast rather than silently enabling global collectors.
 
 ## Operations
@@ -186,7 +167,9 @@ personal-data requirements before adding new sources.
 The upstream PyBikes, Hyper and GBFS API versions are pinned by Git
 commit hash in `Dockerfile`. Upgrades should be deliberate, followed
 by a new image build and schema/GBFS validation. CI runs adapter
-registration tests inside the Docker build; it does not check the
+registration and API tests inside the Docker build (the tests use their
+own temporary registries, so adding scrapers to `config/scrapers.json`
+does not break them, but the committed registry must stay valid); it does not check the
 availability of the live Colombian endpoints.
 
 GBFS output is generated at runtime and **is not a GitHub Release artifact**.

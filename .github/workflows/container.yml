@@ -51,12 +51,14 @@ jobs:
             type=sha,prefix=sha-,format=long
             type=ref,event=tag
 
-      - name: Build, test and publish
+      # Push only the immutable sha- tag here. latest and v* tags are
+      # promoted after the Compose smoke test passes (see below).
+      - name: Build, test and push candidate image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ghcr.io/colombiatransit/gbfs-colombia:sha-${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -65,13 +67,16 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           GBFS_IMAGE: ghcr.io/colombiatransit/gbfs-colombia:sha-${{ github.sha }}
+          GBFS_CONTACT_EMAIL: ci@example.invalid
         run: |
+          # The API joins an external network that exists on the server.
+          docker network create "${GBFS_SHARED_NETWORK:-traefik_default}"
           docker compose pull
           docker compose up -d
-          # Probe from a separate container on the shared network: no host ports.
+          # Probe from a separate container on the external network: no host ports.
           probe() {
             docker run --rm \
-              --network "${GBFS_SHARED_NETWORK:-gbfs-colombia-shared}" \
+              --network "${GBFS_SHARED_NETWORK:-traefik_default}" \
               --entrypoint python "$GBFS_IMAGE" \
               -c 'import urllib.request; urllib.request.urlopen("http://gbfs-colombia:8000/healthz", timeout=3)'
           }
@@ -82,6 +87,11 @@ jobs:
             sleep 2
           done
           probe
+          # The GBFS app itself must answer, not only the liveness route.
+          docker run --rm \
+            --network "${GBFS_SHARED_NETWORK:-traefik_default}" \
+            --entrypoint python "$GBFS_IMAGE" \
+            -c 'import json, urllib.request; json.load(urllib.request.urlopen("http://gbfs-colombia:8000/3/manifest.json", timeout=5))["data"]["datasets"]'
           # Enforce that Docker has not bound any API port on the host.
           test "$(docker inspect -f '{{len .HostConfig.PortBindings}}' "$(docker compose ps -q api)")" = "0"
           for service in publisher subscriber api; do
@@ -90,6 +100,18 @@ jobs:
             test "$(docker inspect -f '{{.State.Running}}' "$container_id")" = "true"
           done
           docker compose ps
+
+      - name: Promote tested image tags
+        if: github.event_name != 'pull_request'
+        env:
+          SOURCE: ghcr.io/colombiatransit/gbfs-colombia:sha-${{ github.sha }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          while read -r tag; do
+            if [ -n "$tag" ] && [ "$tag" != "$SOURCE" ]; then
+              docker buildx imagetools create --tag "$tag" "$SOURCE"
+            fi
+          done <<< "$TAGS"
 
       - name: Show Compose logs on failure
         if: failure() && github.event_name != 'pull_request'
