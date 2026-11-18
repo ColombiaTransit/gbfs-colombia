@@ -97,13 +97,20 @@ GBFS 3.0 requires a monitored `feed_contact_email` and
 `system_information.json` returns HTTP 503 instead of inventing a contact.
 The initial `24/7 unknown` opening_hours expression explicitly indicates
 unverified hours; replace it with verified OSM opening_hours values per
-network using `GBFS_OPENING_HOURS_ENCICLA` or
-`GBFS_OPENING_HOURS_TEMBICI_BOGOTA`.
+network using `GBFS_OPENING_HOURS_<TAG>` (tag upper-cased, `-` replaced
+by `_`), e.g. `GBFS_OPENING_HOURS_ENCICLA` or
+`GBFS_OPENING_HOURS_TEMBICI_BOGOTA`. The `api` and `publisher` services
+read `.env` directly, so these work for any enabled network without
+editing `compose.yaml`.
 Changes to `.env` take effect after `docker compose up -d`.
 
 For external clients, use Traefik with HTTPS; the Docker host does not
 publish a GBFS API port. Generated feed URLs use the incoming request
-host/scheme, so forward the appropriate Host and HTTPS headers from Traefik.
+host/scheme. Traefik forwards `Host` and `X-Forwarded-Proto` by default;
+uvicorn only honours them from addresses listed in
+`GBFS_FORWARDED_ALLOW_IPS` (default `*`, which is acceptable because the API
+is reachable only over the shared Docker network). Narrow it to Traefik's
+address or subnet if untrusted containers join that network.
 For OTP, ensure it can resolve and reach the network alias and every URL
 linked inside the GBFS discovery feed.
 
@@ -116,8 +123,9 @@ ghcr.io/colombiatransit/gbfs-colombia:latest
 ```
 
 The GitHub Actions workflow builds and tests the image on push and
-publishes it to GHCR from `main` and `v*` tags. It also publishes
-`sha-...` tags. Pin a version tag or digest for reproducible deployments.
+publishes it to GHCR from `main` and `v*` tags. It first pushes an
+immutable `sha-...` tag, runs a Compose smoke test against it, and only
+then promotes it to `latest` or the version tag. Pin a version tag or digest for reproducible deployments.
 If the package is not public initially, set its GHCR package visibility to
 **Public** in the GitHub organization's package settings.
 
@@ -150,7 +158,7 @@ docker compose up -d
       "country": "CO",
       "latitude": 3.4516,
       "longitude": -76.5320,
-      "company": []
+      "company": ["Operator name"]
     }
   }
 ]
@@ -160,7 +168,12 @@ This JSON is an **example configuration**, not a claim that this bike
 sharing system or provider exists. Never enable the example until you
 have implemented and tested a real data source.
 
-4. Add `cali-bikes` to `ENABLED_NETWORKS` in `.env`.
+   `meta.company` is required and must be a list of operator names
+   (use `[]` if unknown). The tag must not reuse an upstream PyBikes
+   tag such as `encicla`; collisions are rejected at startup.
+4. Add `cali-bikes` to `ENABLED_NETWORKS` in `.env`. Optionally set
+   `GBFS_OPENING_HOURS_CALI_BIKES`. If the adapter sets `authed = True`,
+   provide its key as `PYBIKES_COLOMBIA_CALI_BIKES` in `.env`.
 5. Commit the changes so GitHub Actions builds a new image, then deploy
    that image and restart the stack. New Python modules are bundled into
    the image; editing a running container is not required.
@@ -168,7 +181,7 @@ have implemented and tested a real data source.
 The adapter registry is deliberately restricted to modules within
 `colombia_gbfs.scrapers`. At startup the code verifies that the
 network is registered, the adapter subclasses `BikeShareSystem`, and
-its metadata declares `country: CO`. Unregistered or foreign network
+its metadata declares `country: CO` and a `company` list. Unregistered or foreign network
 tags fail fast rather than silently enabling global collectors.
 
 ## Operations
@@ -186,7 +199,9 @@ personal-data requirements before adding new sources.
 The upstream PyBikes, Hyper and GBFS API versions are pinned by Git
 commit hash in `Dockerfile`. Upgrades should be deliberate, followed
 by a new image build and schema/GBFS validation. CI runs adapter
-registration tests inside the Docker build; it does not check the
+registration and API tests inside the Docker build (the tests use their
+own temporary registries, so adding scrapers to `config/scrapers.json`
+does not break them, but the committed registry must stay valid); it does not check the
 availability of the live Colombian endpoints.
 
 GBFS output is generated at runtime and **is not a GitHub Release artifact**.

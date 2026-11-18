@@ -19,6 +19,10 @@ services:
   publisher:
     image: *gbfs-image
     command: ["python", "-m", "colombia_gbfs.publisher"]
+    # Optional .env passthrough, e.g. PYBIKES_<MODULE> keys for authed adapters.
+    env_file:
+      - path: .env
+        required: false
     environment:
       ENABLED_NETWORKS: ${ENABLED_NETWORKS:-encicla,tembici-bogota}
       UPDATE_INTERVAL_SECONDS: ${UPDATE_INTERVAL_SECONDS:-180}
@@ -54,13 +58,19 @@ services:
 
   api:
     image: *gbfs-image
+    # Optional .env passthrough, so GBFS_OPENING_HOURS_<TAG> works for any
+    # enabled network without editing this file.
+    env_file:
+      - path: .env
+        required: false
     environment:
       DB_URI: /data/citybikes.db
       ENABLED_NETWORKS: ${ENABLED_NETWORKS:-encicla,tembici-bogota}
       GBFS_CONTACT_EMAIL: ${GBFS_CONTACT_EMAIL:-}
       GBFS_OPENING_HOURS: "${GBFS_OPENING_HOURS:-24/7 unknown}"
-      GBFS_OPENING_HOURS_ENCICLA: "${GBFS_OPENING_HOURS_ENCICLA:-}"
-      GBFS_OPENING_HOURS_TEMBICI_BOGOTA: "${GBFS_OPENING_HOURS_TEMBICI_BOGOTA:-}"
+      # Trust X-Forwarded-Proto/For from Traefik so generated feed URLs use
+      # https. The API is reachable only via the shared Docker network.
+      FORWARDED_ALLOW_IPS: "${GBFS_FORWARDED_ALLOW_IPS:-*}"
     # No host port is published. Traefik and OTP use the shared Docker network.
     expose:
       - "8000"

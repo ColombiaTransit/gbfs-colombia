@@ -9,7 +9,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Mount, Route
 
 from citybikes.db.asyncio import CBD, get_session, migrate
-from citybikes.gbfs.versions.v3.api import Gbfs as UpstreamGbfs3
+from citybikes.gbfs.versions.v3.api import LANGUAGES, Gbfs as UpstreamGbfs3
 from colombia_gbfs.registry import enabled_networks
 
 ALLOWED = set(enabled_networks())
@@ -45,11 +45,17 @@ class ColombiaGbfs3(UpstreamGbfs3):
         # not yet been verified; it must not be mistaken for 24/7 service.
         # Do not claim ColombiaTransit operates the bicycles. The operator
         # field retains the original provider identity.
-        return info.model_copy(update={
+        # Rebuild the model instead of model_copy(update=...): model_copy
+        # skips validation, so a plain string would be emitted where GBFS 3.0
+        # requires an array of localized strings.
+        return self.GBFS.SystemInfo(**{
+            **info.model_dump(),
             "timezone": "America/Bogota",
             "opening_hours": hours,
             "feed_contact_email": contact,
-            "attribution_organization_name": "ColombiaTransit",
+            "attribution_organization_name": [
+                {"language": LANGUAGES[0], "text": "ColombiaTransit"},
+            ],
             "attribution_url": "https://github.com/ColombiaTransit/gbfs-colombia",
         })
 

@@ -52,6 +52,11 @@ def load_registry(path=None):
             raise ValueError(f"Scraper {tag} must declare meta.country=CO")
         if not all(meta.get(key) is not None for key in ("name", "city", "latitude", "longitude")):
             raise ValueError(f"Scraper {tag} lacks required network metadata")
+        # The GBFS API's network model requires a list of operator names;
+        # without it system_information.json fails with HTTP 500.
+        company = meta.get("company")
+        if not isinstance(company, list) or not all(isinstance(c, str) for c in company):
+            raise ValueError(f"Scraper {tag} must declare meta.company as a list of strings")
         if tag in tags:
             raise ValueError(f"Duplicate custom scraper: {tag}")
         tags.add(tag)
@@ -80,6 +85,10 @@ def activate(allowed=None, registry_path=None):
                        for module, cls, entry in upstream_entries}
     registry = load_registry(registry_path)
     custom_by_tag = {entry["tag"]: entry for entry in registry}
+    collisions = sorted(set(custom_by_tag) & set(upstream_by_tag))
+    if collisions:
+        raise ValueError("Custom scraper tags collide with upstream PyBikes networks: "
+                         + ", ".join(collisions))
     selected = []
     aliases = {}
 
@@ -98,8 +107,6 @@ def activate(allowed=None, registry_path=None):
         cls = getattr(module, spec["class"])
         if not isinstance(cls, type) or not issubclass(cls, BikeShareSystem):
             raise TypeError(f"{tag}: adapter must subclass BikeShareSystem")
-        if module_name in aliases and aliases[module_name] is not module:
-            raise ValueError(f"Duplicate adapter module: {module_name}")
         aliases[module_name] = module
         selected.append((module_name, spec["class"],
                          {"tag": spec["tag"], "meta": spec["meta"]}))
