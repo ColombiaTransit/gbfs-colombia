@@ -12,8 +12,6 @@ services:
       - gbfs-data:/data
     networks:
       - backend
-    labels:
-      traefik.enable: "false"
     restart: "no"
 
   publisher:
@@ -30,8 +28,6 @@ services:
       N_WORKERS_PYBIKES: "4"
     networks:
       - backend
-    labels:
-      traefik.enable: "false"
     read_only: true
     tmpfs:
       - /tmp
@@ -52,8 +48,6 @@ services:
         condition: service_started
     networks:
       - backend
-    labels:
-      traefik.enable: "false"
     restart: unless-stopped
 
   api:
@@ -68,24 +62,14 @@ services:
       ENABLED_NETWORKS: ${ENABLED_NETWORKS:-encicla,tembici-bogota}
       GBFS_CONTACT_EMAIL: ${GBFS_CONTACT_EMAIL:-}
       GBFS_OPENING_HOURS: "${GBFS_OPENING_HOURS:-24/7 unknown}"
-      # Trust X-Forwarded-Proto/For from Traefik so generated feed URLs use
-      # https. The API is reachable only via the shared Docker network.
-      FORWARDED_ALLOW_IPS: "${GBFS_FORWARDED_ALLOW_IPS:-*}"
-    # No host port is published. Traefik and OTP use the shared Docker network.
+    # No host port is published. Other containers (e.g. OTP) reach the API
+    # on the existing external network as http://gbfs-colombia:8000.
     expose:
       - "8000"
     networks:
-      shared:
+      gbfs-shared:
         aliases:
           - gbfs-colombia
-    labels:
-      traefik.enable: "${GBFS_TRAEFIK_ENABLED:-false}"
-      traefik.docker.network: "${GBFS_SHARED_NETWORK:-gbfs-colombia-shared}"
-      traefik.http.routers.gbfs-colombia.rule: "Host(`${GBFS_TRAEFIK_HOST:-gbfs.invalid}`)"
-      traefik.http.routers.gbfs-colombia.entrypoints: "${GBFS_TRAEFIK_ENTRYPOINT:-websecure}"
-      traefik.http.routers.gbfs-colombia.tls: "true"
-      traefik.http.routers.gbfs-colombia.service: "gbfs-colombia"
-      traefik.http.services.gbfs-colombia.loadbalancer.server.port: "8000"
     volumes:
       - gbfs-data:/data
     depends_on:
@@ -106,9 +90,11 @@ services:
 # internal: publisher needs outbound access to the original bike providers.
 networks:
   backend:
-  shared:
-    # Predictable name so other Compose projects can attach as external.
-    name: ${GBFS_SHARED_NETWORK:-gbfs-colombia-shared}
+  # Existing network shared with other stacks on this host. It is not
+  # created or removed by this project; it must exist before `up`.
+  gbfs-shared:
+    external: true
+    name: ${GBFS_SHARED_NETWORK:-traefik_default}
 
 volumes:
   gbfs-data:

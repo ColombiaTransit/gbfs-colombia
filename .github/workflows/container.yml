@@ -69,12 +69,14 @@ jobs:
           GBFS_IMAGE: ghcr.io/colombiatransit/gbfs-colombia:sha-${{ github.sha }}
           GBFS_CONTACT_EMAIL: ci@example.invalid
         run: |
+          # The API joins an external network that exists on the server.
+          docker network create "${GBFS_SHARED_NETWORK:-traefik_default}"
           docker compose pull
           docker compose up -d
-          # Probe from a separate container on the shared network: no host ports.
+          # Probe from a separate container on the external network: no host ports.
           probe() {
             docker run --rm \
-              --network "${GBFS_SHARED_NETWORK:-gbfs-colombia-shared}" \
+              --network "${GBFS_SHARED_NETWORK:-traefik_default}" \
               --entrypoint python "$GBFS_IMAGE" \
               -c 'import urllib.request; urllib.request.urlopen("http://gbfs-colombia:8000/healthz", timeout=3)'
           }
@@ -87,7 +89,7 @@ jobs:
           probe
           # The GBFS app itself must answer, not only the liveness route.
           docker run --rm \
-            --network "${GBFS_SHARED_NETWORK:-gbfs-colombia-shared}" \
+            --network "${GBFS_SHARED_NETWORK:-traefik_default}" \
             --entrypoint python "$GBFS_IMAGE" \
             -c 'import json, urllib.request; json.load(urllib.request.urlopen("http://gbfs-colombia:8000/3/manifest.json", timeout=5))["data"]["datasets"]'
           # Enforce that Docker has not bound any API port on the host.

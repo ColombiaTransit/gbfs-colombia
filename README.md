@@ -20,11 +20,10 @@ One GHCR image, four Compose services:
 
 No container publishes TCP ports on the Docker host. The `publisher`,
 `subscriber`, and `migrate` services communicate only on their Compose
-backend network. The `api` joins the predictably named bridge network
-`gbfs-colombia-shared`, where it is reachable as `http://gbfs-colombia:8000`.
-The `publisher` can still reach the upstream providers over the internet.
-Traefik and OpenTripPlanner (OTP) can join this shared network from their
-own Compose projects without conflicting with host ports. The database
+backend network. The `api` additionally joins the existing external
+Docker network `traefik_default`, where it is reachable as
+`http://gbfs-colombia:8000`. The `publisher` can still reach the upstream
+providers over the internet. The database
 persists in the `gbfs-data` named Docker volume.
 
 ## Quick start
@@ -34,60 +33,39 @@ git clone https://github.com/ColombiaTransit/gbfs-colombia.git
 cd gbfs-colombia
 cp .env.example .env
 # Edit .env: set GBFS_CONTACT_EMAIL to a monitored address.
+docker network inspect traefik_default >/dev/null  # must already exist
 docker compose pull
 docker compose up -d
 docker compose ps
 ```
 
-Once live provider updates have arrived, **from a container on the shared
-Docker network** use:
+Once live provider updates have arrived, **from a container on the
+`traefik_default` network** use:
 
 - `http://gbfs-colombia:8000/3/manifest.json`
 - `http://gbfs-colombia:8000/3/encicla/gbfs.json`
 - `http://gbfs-colombia:8000/3/tembici-bogota/gbfs.json`
 - `http://gbfs-colombia:8000/healthz` (API liveness only)
 
-The host cannot access these URLs directly without joining the Docker
-network or going through Traefik. To check liveness on the server:
+The host cannot access these URLs directly. To check liveness on the server:
 
 ```sh
 docker compose exec -T api python -c 'import urllib.request; print(urllib.request.urlopen("http://127.0.0.1:8000/healthz").read().decode())'
 ```
 
-### Traefik and OTP connectivity
+### Network
 
-This Compose stack automatically creates a shared bridge network named
-`gbfs-colombia-shared`. In **each separate Traefik or OTP Compose project**
-that must access the API, attach its service to that network, declaring:
+The `api` service joins the external network `traefik_default`, which
+this stack neither creates nor removes; `docker compose up` fails if it
+does not exist. Any container on that network (for example OTP) reaches
+the API as `http://gbfs-colombia:8000`. To use a different existing
+network, set `GBFS_SHARED_NETWORK` in `.env`.
 
-```yaml
-services:
-  # Example: merge this into your existing Traefik or OTP service.
-  otp:
-    networks:
-      - gbfs-shared
-
-networks:
-  gbfs-shared:
-    external: true
-    name: gbfs-colombia-shared
-```
-
-The example service name `otp` is illustrative; use your real service name.
-The network must already exist, so start the GBFS stack first. To reuse a
-name other than `gbfs-colombia-shared`, set `GBFS_SHARED_NETWORK` in
-`.env`, and use the same name for the other Compose projects.
-
-**Traefik routing is disabled by default** (`GBFS_TRAEFIK_ENABLED=false`).
-Once Traefik has joined the shared network, set
-`GBFS_TRAEFIK_HOST` to your public DNS hostname,
-`GBFS_TRAEFIK_ENTRYPOINT` to its HTTPS entrypoint (default `websecure`),
-and `GBFS_TRAEFIK_ENABLED=true`. Then run `docker compose up -d` to
-apply the new labels. Traefik discovers port `8000` over the shared network,
-not a host port. Ensure HTTPS and certificates are configured on Traefik.
-
-OTP can fetch EnCicla and Tembici GBFS directly using the two URLs above.
-The exact updater configuration depends on your OTP version.
+No reverse-proxy routing is configured: the API is not exposed publicly.
+Generated feed URLs use the host and scheme of the incoming request, so
+OTP sees `http://gbfs-colombia:8000/...` URLs, which it can reach on the
+same network. The exact OTP updater configuration depends on your OTP
+version.
 
 **Data freshness is not guaranteed by the health endpoint.** Check
 `last_updated`, provider availability, and logs before advertising feeds.
@@ -103,16 +81,6 @@ by `_`), e.g. `GBFS_OPENING_HOURS_ENCICLA` or
 read `.env` directly, so these work for any enabled network without
 editing `compose.yaml`.
 Changes to `.env` take effect after `docker compose up -d`.
-
-For external clients, use Traefik with HTTPS; the Docker host does not
-publish a GBFS API port. Generated feed URLs use the incoming request
-host/scheme. Traefik forwards `Host` and `X-Forwarded-Proto` by default;
-uvicorn only honours them from addresses listed in
-`GBFS_FORWARDED_ALLOW_IPS` (default `*`, which is acceptable because the API
-is reachable only over the shared Docker network). Narrow it to Traefik's
-address or subnet if untrusted containers join that network.
-For OTP, ensure it can resolve and reach the network alias and every URL
-linked inside the GBFS discovery feed.
 
 ## Image and releases
 
