@@ -227,3 +227,17 @@ unresolved.
 admin endpoint is a usable public feed. If revisited, prioritize
 the actual public *customer* app or an operator-provided,
 read-only availability feed. Avoid mining private/admin inventory.
+
+
+## User-supplied Flotu XAPK 1.8.5 — static review, 2026-11-19
+
+A user-supplied `flotu_1.8.5_APKPure.xapk` archive was inspected locally without installing or launching the app, account creation, emulator use, or private data access.
+
+- XAPK manifest package `com.pivvot.FlotuApp`, version name `1.8.5`, version code `103`, minimum SDK 24, target SDK 36.
+- XAPK SHA-256: `b3b5298b034d5a48b4790c57f02bf9861b78985564043bbdf622828ca3373fa1`.
+- The base APK contains `assets/index.android.bundle` (5,955,744 bytes), a **compiled Hermes bytecode bundle**, not ordinary plain-text JavaScript. React Native/Expo modules are present. This makes naïve `strings`/regular-expression extraction ambiguous because different string-table values are packed together.
+- Static bundle string-table leads include `https://app.flotu.com`, `/api/v1/vehicles/by-company/`, `/api/v1/marker-images/for-app`, `/categories-and-vehicles`, `/available_vehicles/fleet-list`, and UI concepts for `station`, `vehicle`, `availability`, and `location`. Treat these as **candidate literals only**. Their grouping in extracted bytes does not establish a complete request URL, HTTP method, authentication requirements, or response schema.
+- These mobile-side leads support prioritizing the **public customer app vehicle discovery flow** over additional exploration of the admin console. Do not assume the admin `/api/v1/vehicles/` response (HTTP 200 with empty `results` in a previous test) is the customer-facing inventory source.
+- No live vehicle ID, vehicle location, active station, rentable bike count or anonymous customer-app endpoint has yet been validated. A public GBFS feed is still **not ready**.
+
+**One bounded next step (no more APKs needed):** use a proper Hermes bytecode disassembler (or a provider-documented public endpoint) to resolve how customer app request URLs are assembled and whether the app requests anonymous vehicle discovery; then test only a confirmed public-read request with no personal account, booking, tracking or admin functions. If the relevant route is authenticated, pause and ask the provider for read-only GBFS/public data access. Avoid inferring working endpoints solely from string concatenation.
