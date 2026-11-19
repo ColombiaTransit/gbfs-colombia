@@ -1,0 +1,31 @@
+name: Inspect Flotu JavaScript API route literals
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/inspect_flotu_endpoints.py"
+      - ".github/workflows/inspect-flotu-endpoints.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  static-js:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Syntax check
+        run: python -m py_compile tools/inspect_flotu_endpoints.py
+      - name: Analyze only public Flotu marketing/admin JS bundles
+        run: python -m tools.inspect_flotu_endpoints | tee flotu-js-endpoint-inventory.txt
+      - name: Save sanitized inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flotu-js-endpoint-inventory
+          path: flotu-js-endpoint-inventory.txt
+          if-no-files-found: warn
+          retention-days: 7
