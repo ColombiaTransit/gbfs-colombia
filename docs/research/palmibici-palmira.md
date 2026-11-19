@@ -62,7 +62,11 @@ Verified via GitHub Actions runner:
 ## Registration gate verified and scope decision (2026-11-19)
 
 The user confirmed that opening the PalmiBici webapp leads to
-**registration/login before accessing its functionality**.
+**registration/login before accessing its functionality**. Crucially,
+**the PWA station map is not visible at all before registration/login**.
+This is a user-verified UI restriction, not proof of any particular API
+authorization scheme. The separate public marketing website's historic
+station list is *not* the login-gated live PWA map.
 
 The operator's public website separately documents a registration
 process: existing users sign in with username and password;
@@ -70,8 +74,8 @@ new users register, then visit the operations centre for their
 system card. Source: https://palmibici.com.co/
 
 **Distinguish three separate facts:**
-1. The PWA has a registration/login gate for the relevant user
-   interface, as the user observed.
+1. The PWA has a registration/login gate for its user interface,
+   **including the station map**, as the user observed.
 2. Its static JavaScript assets are publicly retrievable, and a
    backend hostname was previously discovered.
 3. Neither fact establishes an **anonymous, publicly licensed,
@@ -79,7 +83,8 @@ system card. Source: https://palmibici.com.co/
    URLs returned 404; no legitimate anonymous station-data
    endpoint has been confirmed.
 
-**Decision:** Hold PalmiBici at research-only status; do not create
+**Decision:** Hold PalmiBici at research-only status. No public
+anonymous station map or feed has been confirmed; do not create
 accounts solely for scraping, use another person's credentials,
 invoke private/authenticated fleet endpoints, or register an active
 GBFS adapter. Researching the existing public JavaScript may identify
