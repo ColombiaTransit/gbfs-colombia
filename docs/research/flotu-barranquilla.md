@@ -241,3 +241,7 @@ A user-supplied `flotu_1.8.5_APKPure.xapk` archive was inspected locally without
 - No live vehicle ID, vehicle location, active station, rentable bike count or anonymous customer-app endpoint has yet been validated. A public GBFS feed is still **not ready**.
 
 **One bounded next step (no more APKs needed):** use a proper Hermes bytecode disassembler (or a provider-documented public endpoint) to resolve how customer app request URLs are assembled and whether the app requests anonymous vehicle discovery; then test only a confirmed public-read request with no personal account, booking, tracking or admin functions. If the relevant route is authenticated, pause and ask the provider for read-only GBFS/public data access. Avoid inferring working endpoints solely from string concatenation.
+
+## Research scope decision — 2026-11-19
+
+The user reconfirmed that `https://app.flotu.com` was previously investigated and its administration UI cannot be accessed without signing in. The prior anonymous `/api/v1/vehicles/` test returned HTTP 200 with an empty `results` array; this exception does not establish publicly usable inventory. **Do not repeat login or admin-portal investigation.** The Flotu 1.8.5 mobile-app strings remain unverified candidate leads, not working or anonymous API routes. Pause Flotu pending a clearly separate public customer availability endpoint or an operator-authorized data feed. No production GBFS adapter is warranted.
