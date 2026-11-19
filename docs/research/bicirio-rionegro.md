@@ -1,6 +1,6 @@
 # BiciRio (Rionegro) — GBFS source investigation
 
-**State:** PyBikes adapter implemented and live dry-run verified; opt-in GBFS remains disabled by default  
+**State:** PyBikes adapter implemented, all 16 current public API stations geolocated using official map references; GBFS remains opt-in  
 **Observed:** 2026-11-15 (Sunday), GitHub Actions runner  
 **Operator:** SOMOS Movilidad Rionegro S.A.S. / municipality of Rionegro, Antioquia, Colombia  
 **Candidate network tag:** `bicirio-rionegro` (not registered)  
@@ -453,3 +453,99 @@ to sign in to `ghcr.io`; the follow-up run succeeded.
 **Decision:** Implementation is functional, with a successful
 non-publishing live dry-run. Keep `ENABLED_NETWORKS` unchanged until
 the remaining operational and attribution issues are accepted.
+
+
+## Official SOMOS BiciRio station-map coordinates — reconciliation (2026-11-19)
+
+The official BiciRio system page references the public JavaScript file:
+
+- https://somosmovilidad.gov.co/sistema-de-bicicletas-bicirio/
+- https://somosmovilidad.gov.co/somos-mapa/leaflet-routing-machine-3.2.12/examples/index.js
+
+The complete **18** `L.marker([latitude, longitude])` entries were
+provided directly from that operator's public JavaScript. They describe
+the named physical/virtual station locations; **they are not live
+availability observations**. The earlier API positions contained swapped
+latitude/longitude fields and three unrelated names at exactly the
+same coordinate. The independent operator map is now the preferred
+reference for recognized public station names.
+
+| Official map station name | Latitude | Longitude |
+|---|---:|---:|
+| El Faro | 6.1412796 | -75.3770481 |
+| La Cuarta | 6.150792 | -75.392205 |
+| Los Edificios | 6.149323 | -75.385319 |
+| San Antonio | 6.130296 | -75.3804 |
+| Plaza de la Libertad | 6.153696 | -75.373764 |
+| San Francisco | 6.154190 | -75.372542 |
+| San Nicolás | 6.146392 | -75.379080 |
+| Palos Verdes | 6.126285 | -75.383984 |
+| Cuatro Esquinas | 6.153292 | -75.362879 |
+| El Porvenir | 6.146621 | -75.386334 |
+| Unidad Deportiva | 6.146114 | -75.374173 |
+| Santa Ana | 6.15135 | -75.36912 |
+| El Hospital | 6.158937 | -75.370605 |
+| Porvenir 50 | 6.1476775 | -75.3893921 |
+| Barro Blanco | 6.153107 | -75.408059 |
+| Villa Camila | 6.148877 | -75.357714 |
+| Quebrada Arriba | 6.157583 | -75.375444 |
+| Zona Franca | 6.157769 | -75.412286 |
+
+**Previously duplicated API point**
+`6.147648, -75.390290` was shared by IDs **21 El Faro**,
+**24 Porvenir 50**, and **31 La Cuarta**. The named operator map
+resolves them separately:
+
+- El Faro (21): `6.1412796, -75.3770481`
+- Porvenir 50 (24): `6.1476775, -75.3893921`
+- La Cuarta (31): `6.150792, -75.392205`
+
+### Implementation and acceptance
+
+Code update:
+https://github.com/ColombiaTransit/gbfs-colombia/blob/main/colombia_gbfs/scrapers/bicirio.py
+
+- `OFFICIAL_MAP_COORDINATES` contains all **18** operator map locations,
+  in WGS84 `(latitude, longitude)` order.
+- The scraper matches **normalized station names** to the map
+  (including `Edificios` → `Los Edificios` and
+  `Hospital` → `El Hospital`). Accent, whitespace and capitalization
+  differences are normalized.
+- For names not yet on the public map, strictly validated API
+  coordinates remain a fallback. No coordinates are invented.
+- The map is used **only for positions**; all bike availability and
+  stations' current operational states come from the public API.
+- The public `Bodega` and internal `Virtual` API records are
+  intentionally excluded. `Quebrada Arriba` and `Zona Franca`
+  are represented on the historical/public map but currently
+  **lack matching station records in the queried live API**.
+  They are not fabricated as GBFS stations and receive no invented
+  bike counts.
+- Stable station IDs are retained; duplicate-location protection
+  remains enabled as a last-resort sanity check.
+
+**Validated Docker image build:**
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44519770634
+
+**Successful live Docker dry-run (after the coordinate fix):**
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44520077780
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Public stations emitted from API | 14 | **16** |
+| Bicycle objects observed | 20 | **26** |
+| Stations reporting online | 12 | **13** |
+| Missing/conflicting among known API public station coordinates | 2 | **0** |
+| Internal API records excluded | 2 | **2** |
+
+Counts are from **different live snapshots**, not a measure of
+system-wide fleet growth. The smoke test expressly checked
+IDs `21`, `24`, `31` against their official-map locations
+and verified all 16 public API station IDs remained unique.
+
+**Outcome:** Coordinate conflicts solved for the 16 currently present
+non-internal API station records. Static map marker presence does not
+establish current service for additional named sites. Before default
+GBFS publication, operator redistribution conditions, station-hour
+accuracy and the semantics of station online status should still
+be reviewed. The adapter remains opt-in.
