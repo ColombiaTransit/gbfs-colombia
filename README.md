@@ -104,6 +104,60 @@ docker compose pull
 docker compose up -d
 ```
 
+## BiciRio Rionegro (opt-in scraper)
+
+The `bicirio-rionegro` plugin is implemented at
+[`colombia_gbfs/scrapers/bicirio.py`](colombia_gbfs/scrapers/bicirio.py),
+registered in `config/scrapers.json`, and covered by offline tests.
+A one-off, **non-publishing** live run on 2026-11-19 succeeded:
+**14** conservatively geolocated public station records, **20** public
+bicycle objects, **12** stations reporting online. These are a single
+snapshot, not permanent network totals.
+
+- Operator data: only the two known public, unauthenticated
+  `/api/v1/free_access/{stations,bicycles}` GET endpoints.
+- Bicycle count: the official web-map's `len(bicycle_list)` approach.
+  The currently observed `bicycleState` is `Ready`; unknown future
+  states cause a visible scraper error rather than silently counting
+  potentially unavailable bikes.
+- Station positions: per-record latitude/longitude orientation checks;
+  invalid/internal stations and conflicting coordinates are excluded,
+  not published at an invented location. Station identifiers are stable
+  and independent of coordinates.
+- Station operations: `state=Open` and `connectionState=true`
+  indicate online for this initial implementation. No made-up
+  dock capacities or bike identifiers are published. Failed upstream
+  requests abort the snapshot instead of fabricating zero availability.
+- TLS: BiciRio omits a GoDaddy G2 intermediate certificate. During
+  Docker build, the intermediate is downloaded over verified HTTPS
+  from GoDaddy, fingerprint-checked, and included in a **BiciRio-only
+  Requests CA bundle**. Normal hostname and certificate verification
+  remain enabled. The system-wide trust store is not modified.
+- **Not enabled by default** because official public station roster
+  and source coordinates differ, and data redistribution terms should
+  be confirmed before publishing.
+
+To opt in after reviewing the outstanding source/permission questions,
+edit `.env`:
+
+```dotenv
+ENABLED_NETWORKS=encicla,tembici-bogota,bicirio-rionegro
+GBFS_OPENING_HOURS_BICIRIO_RIONEGRO=Mo-Fr 06:00-18:00; Sa 06:00-16:00
+```
+
+The hours above are the operator's historically published weekday/
+Saturday hours; **verify current hours before applying them**. After
+a tested image has been published, run `docker compose pull` and
+`docker compose up -d`. Inspect the publisher logs and the
+`/3/bicirio-rionegro/station_status.json` response from a container
+on the shared network, checking data freshness and station status.
+
+CI tests: [image build workflow](.github/workflows/container.yml);
+public-data dry-run: [BiciRio live smoke test](.github/workflows/bicirio-live-dry-run.yml)
+(requires read access to GHCR and uses the validated `latest` image).
+Research and acceptance criteria:
+[`docs/research/bicirio-rionegro.md`](docs/research/bicirio-rionegro.md).
+
 ## Add your own Colombian scraper
 
 1. Copy `colombia_gbfs/scrapers/example_adapter.py` into a new module
