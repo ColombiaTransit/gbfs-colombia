@@ -1,7 +1,11 @@
-name: BiciRio live adapter smoke test (manual)
+name: BiciRio live adapter smoke test
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "tools/smoke_bicirio_scraper.py"
+      - ".github/workflows/bicirio-live-dry-run.yml"
 
 permissions:
   contents: read
