@@ -245,3 +245,15 @@ A user-supplied `flotu_1.8.5_APKPure.xapk` archive was inspected locally without
 ## Research scope decision — 2026-11-19
 
 The user reconfirmed that `https://app.flotu.com` was previously investigated and its administration UI cannot be accessed without signing in. The prior anonymous `/api/v1/vehicles/` test returned HTTP 200 with an empty `results` array; this exception does not establish publicly usable inventory. **Do not repeat login or admin-portal investigation.** The Flotu 1.8.5 mobile-app strings remain unverified candidate leads, not working or anonymous API routes. Pause Flotu pending a clearly separate public customer availability endpoint or an operator-authorized data feed. No production GBFS adapter is warranted.
+
+## User-run candidate endpoint checks — 2026-11-19
+
+Windows PowerShell anonymous GET tests against the three APK-string-derived paths on `https://app.flotu.com` returned:
+
+| Path | Observed result | Interpretation |
+| --- | --- | --- |
+| `/api/v1/vehicles/by-company/` | HTTP 404 Not Found | No endpoint exposed at this exact URL; the app may require a parameter or different API host, neither established |
+| `/categories-and-vehicles` | HTTP 200 `text/html`, title `Flotu Admin Console` | Admin SPA shell, not station/vehicle JSON |
+| `/available_vehicles/fleet-list` | HTTP 200 `text/html`, title `Flotu Admin Console` | Admin SPA shell, not station/vehicle JSON |
+
+These findings do **not** establish working public customer-app availability. Stop speculative URL probing and repeated admin login checks. Only revisit if a verified customer API request or operator-provided anonymous data source becomes available. No scraper activation.
