@@ -134,6 +134,56 @@ read-only relay is an option only where the operator authorizes this.
 Keep the production GBFS feed unchanged until access and licensing
 are validated.
 
+## Hostname placement follow-up (2026-11-19)
+
+The user reports two further protected diagnostics from the deployed
+Worker, at **07:27:24 UTC** and **07:41:44 UTC** after experimenting with
+Service/Hostname Placement:
+
+| Signal | 07:27 UTC | 07:41 UTC |
+| --- | --- | --- |
+| Worker execution colo | `AMS` | `AMS` |
+| Reported IPv6 egress estimate | `2a06:98c0:3600::103` | Same |
+| Third-party egress country estimate | `US` | `US` |
+| EnCicla upstream status | **403 text/html** | **403 text/html** |
+| Source JSON station records | None | None |
+
+The tests show **no effective improvement** from the prior baseline.
+The diagnostics alone do not prove that Cloudflare's hostname placement
+configuration was activated or why upstream denies requests. Cloudflare
+placement affects geographic *execution* for latency, not the
+upstream-observed source-IP jurisdiction. Do **not** repeatedly test
+placement or claim a Colombia-based egress is guaranteed.
+
+The currently deployed Worker and existing GBFS publisher remain
+unchanged; no live EnCicla inventory can be published from this source
+until a usable source and reuse permission are confirmed.
+
+### Alternate verified official sources
+
+- EnCicla operator's public site describes a **live station availability
+  map/app**, but the public anonymous machine-readable data source is
+  **not yet identified or verified**:
+  https://encicla.metropol.gov.co/preguntas-frecuentes/
+- An official **2022 station XLS dataset** exists and may help with
+  station locations, but **cannot support real-time station status**:
+  https://datosabiertos.metropol.gov.co/node/39
+- Official ArcGIS EnCicla folder contains **cycling route MapServer
+  layers**, not a verified live bicycle-availability endpoint:
+  https://sim.metropol.gov.co/arcgis/rest/services/EnCicla
+- The official system help-page includes a loan-history API, but
+  user/trip records **must not** be queried or used as an alternate
+  source of availability:
+  https://webservices.metropol.gov.co/SIMAPI/Help
+- Operator contact for an official read-only/API feed or allowed IP:
+  **encicla@metropol.gov.co**
+  (https://encicla.metropol.gov.co/preguntas-frecuentes/)
+
+**Decision:** Stop repeated Cloudflare location tests. Research the
+public station map's anonymous availability data or request
+authorization/allowlisting from the operator. Do not proxy through
+third-party access without proper permission.
+
 ## Official references
 
 - https://developers.cloudflare.com/workers/get-started/dashboard/
