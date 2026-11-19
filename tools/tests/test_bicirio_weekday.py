@@ -1,7 +1,7 @@
 """Offline unit tests; they never contact BiciRio."""
 import unittest
 from tools.check_bicirio_weekday import (
-    BIKES, STATIONS, as_records, coordinate_status, exit_status, run_check, select_stations
+    BIKES, STATIONS, as_records, clean_bicycle_state, coordinate_status, exit_status, run_check, select_stations
 )
 
 
@@ -48,16 +48,41 @@ class TestBiciRioWeekday(unittest.TestCase):
             if url == BIKES + "21":
                 return [], False
             if url == BIKES + "37":
-                return [{"id": "do-not-publish-vehicle-id", "status": "AVAILABLE"}], False
+                return [{"id": "do-not-publish-vehicle-id", "bicycleState": "AVAILABLE"}], False
             raise AssertionError(url)
 
         report = run_check(fetch=fake_fetch, pause=lambda _: None)
         self.assertEqual(report["result"], "nonempty_bicycle_responses")
         self.assertEqual(report["total_bicycle_records"], 1)
+        self.assertEqual(report["bicycle_state_counts"], {"AVAILABLE": 1})
+        self.assertEqual(report["tested_stations"][1]["bicycle_state_counts"], {"AVAILABLE": 1})
         self.assertEqual(report["stations_with_nonempty_bicycle_response"], 1)
         self.assertFalse(report["tls_verified_for_all_requests"])
         self.assertNotIn("do-not-publish-vehicle-id", str(report))
         self.assertEqual(called, [STATIONS, BIKES + "21", BIKES + "37"])
+
+    def test_bicycle_state_category_sanitizer(self):
+        self.assertEqual(clean_bicycle_state("AVAILABLE"), "AVAILABLE")
+        self.assertEqual(clean_bicycle_state("On_Maintenance"), "On_Maintenance")
+        self.assertEqual(clean_bicycle_state(3), "3")
+        self.assertEqual(clean_bicycle_state("secret token; unauthorized"), "<unknown_or_missing>")
+        self.assertEqual(clean_bicycle_state({"id": "private"}), "<unknown_or_missing>")
+        self.assertEqual(clean_bicycle_state(None), "<unknown_or_missing>")
+
+    def test_state_aggregate_does_not_persist_bicycle_identifiers(self):
+        def fetch(url):
+            if url == STATIONS:
+                return self.stations, True
+            if url == BIKES + "21":
+                return [{"id": "secret-id-1", "serial": "private-serial",
+                         "bicycleState": "AVAILABLE"},
+                        {"id": "secret-id-2", "bicycleState": "MAINTENANCE"}], True
+            return [], True
+
+        report = run_check(fetch=fetch, pause=lambda _: None)
+        self.assertEqual(report["bicycle_state_counts"], {"AVAILABLE": 1, "MAINTENANCE": 1})
+        self.assertNotIn("secret-id", str(report))
+        self.assertNotIn("private-serial", str(report))
 
     def test_empty_responses_not_accepted_as_proof_of_availability(self):
         def fake_fetch(url):
