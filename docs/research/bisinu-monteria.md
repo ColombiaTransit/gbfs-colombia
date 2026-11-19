@@ -1,7 +1,7 @@
 # Bisinú — Montería, Córdoba, Colombia
 
 Status: **research only; no validated public live data feed**
-Checked: 2026-11-15; Android availability reconfirmed: 2026-11-19
+Checked: 2026-11-19; Android availability reconfirmed: 2026-11-19
 Candidate PyBikes tag: `bisinu-monteria` (not enabled)
 Location: Montería, Córdoba, Colombia
 Timezone: America/Bogota
@@ -100,3 +100,13 @@ data is unavailable.
 **Decision:** keep Bisinú on the research list but do not create
 an active scraper or repeatedly request the currently unavailable
 legacy site.
+
+## Targeted municipal/operator follow-up — 2026-11-19
+
+- **Newer official evidence (2026-09-11):** https://www.monteria.gov.co/publicaciones/6359/alcalde-hugo-kerguelen-avanza-con-findeter-caf-y-el-programa-nuca-para-poner-en-marcha-proyectos-para-conectar-a-monteria-a-traves-de-corredores-verdes/ — the mayor explicitly describes proposed green corridors as complementing the Bisinú public bicycle system. This confirms continued inclusion in municipal mobility planning, **not verified public rental operation on the review date**.
+- **September 2026 municipal recognition:** https://www.monteria.gov.co/publicaciones/6336/alcalde-hugo-kerguelen-recibe-en-espana-reconocimiento-internacional-por-la-apuesta-de-monteria-por-la-sostenibilidad-y-la-innovacion-urbana/ — Bisinú again cited among municipal sustainable mobility projects; also not an operational station roster.
+- Original 2026 report on the intended **12-to-20 station expansion, electric-assist bikes and transfer to La Perla del Sinú** remains a future-plan source: https://larazon.co/monteria-ampliara-bisinu-a-20-estaciones-con-bicicletas-electricas-en-2026/.
+- Checked the public La Perla del Sinú website/news and targeted searches for updated operator announcements, a new user-facing app, station counts, or a public GBFS/API. **No confirming handover announcement, commissioned 20-station roster, replacement app or working anonymous data feed was verified.**
+- **Name collision warning:** November 2026 riverboat news concerns **Businú**, not **Bisinú**, and must not be used as evidence for public bicycle-share operations.
+- Maintain status **modernization and operator transfer announced; current operations and digital access unconfirmed**. Do not enable a realtime GBFS feed, infer 24/7 actual operation from proposed plans, or spend effort on the delisted APK without a new provider lead.
+
