@@ -68,7 +68,7 @@ def requests_check(pem):
         combined = Path(tmp) / "roots-plus-intermediate.pem"
         combined.write_bytes(
             Path(certifi.where()).read_bytes().rstrip() + b"\n" +
-            pem.encode("ascii").strip().encode("ascii") + b"\n"
+            pem.encode("ascii").strip() + b"\n"
         )
         try:
             response = requests.get(
