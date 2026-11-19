@@ -15,7 +15,9 @@ BUNDLE = "https://app.flotu.com/main.605db60a5b2b7808.js"
 ORIGIN = "https://app.flotu.com"
 PUBLIC_REFERENCES = (
     "/api/v1/vehicles",
+    "/api/v1/vehicles/",
     "/api/v1/vehicles/categories",
+    "/api/v1/vehicles/categories/",
 )
 TIMEOUT = (8, 12)
 MAX_JS_BYTES = 2_000_000
