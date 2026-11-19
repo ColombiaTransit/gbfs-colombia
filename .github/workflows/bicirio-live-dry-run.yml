@@ -1,0 +1,24 @@
+name: BiciRio live adapter smoke test (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  live-dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull latest validated GBFS image
+        run: docker pull ghcr.io/colombiatransit/gbfs-colombia:latest
+      - name: One-time official public API read (no feed publishing)
+        run: |
+          docker run --rm \
+            --volume "${{ github.workspace }}/tools/smoke_bicirio_scraper.py:/tmp/smoke_bicirio.py:ro" \
+            --entrypoint python \
+            ghcr.io/colombiatransit/gbfs-colombia:latest \
+            /tmp/smoke_bicirio.py
