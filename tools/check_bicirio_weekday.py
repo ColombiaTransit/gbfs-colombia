@@ -7,6 +7,7 @@ the TLS fallback below is ONLY for this limited public research,
 never for production or requests containing credentials.
 """
 import argparse
+from collections import Counter
 from datetime import datetime, timezone
 import json
 import re
@@ -74,6 +75,15 @@ def as_records(payload):
     raise ValueError("Response is not a station/bicycle list")
 
 
+def clean_bicycle_state(value):
+    """Save only short state category labels, never IDs/serials/details."""
+    if isinstance(value, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,39}", value):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool) and -100 <= value <= 100:
+        return str(value)
+    return "<unknown_or_missing>"
+
+
 def public_request(url):
     allowed = (url == STATIONS or
                (url.startswith(BIKES) and
@@ -123,6 +133,7 @@ def run_check(fetch=public_request, pause=time.sleep):
         "tested_stations": [],
         "stations_with_nonempty_bicycle_response": 0,
         "total_bicycle_records": 0,
+        "bicycle_state_counts": {},
         "tls_verified_for_all_requests": True,
         "result": "not_started",
         "notes": [
@@ -172,12 +183,22 @@ def run_check(fetch=public_request, pause=time.sleep):
             "coordinate_status": coordinate_status(st),
             "bike_record_count": None,
             "bicycle_field_names": [],
+            "bicycle_state_counts": {},
         }
         try:
             payload, verified = fetch(BIKES + sid)
             report["tls_verified_for_all_requests"] &= verified
             bicycles = as_records(payload)
             row["bike_record_count"] = len(bicycles)
+            # Aggregate only: all per-bike identifiers, serials, details
+            # and timestamps are discarded in memory after each station.
+            states = Counter(clean_bicycle_state(b.get("bicycleState"))
+                             if isinstance(b, dict) else "<unknown_or_missing>"
+                             for b in bicycles)
+            row["bicycle_state_counts"] = dict(sorted(states.items()))
+            overall = Counter(report["bicycle_state_counts"])
+            overall.update(states)
+            report["bicycle_state_counts"] = dict(sorted(overall.items()))
             if bicycles and isinstance(bicycles[0], dict):
                 # Do not store personal, vehicle-level or device identifiers.
                 row["bicycle_field_names"] = sorted(bicycles[0].keys())[:40]
@@ -229,6 +250,7 @@ def main():
     print("Total bicycle records (not proven available):",
           report["total_bicycle_records"])
     print("TLS fully verified:", report["tls_verified_for_all_requests"])
+    print("Aggregate bicycleState categories:", report["bicycle_state_counts"])
     print("Executed within 08:00-12:00 Colombia research window:",
           report["within_research_window_08_12_colombia"])
     if report["result"] == "no_nonempty_bicycle_responses":
