@@ -1,0 +1,31 @@
+name: Probe Flotu public route authentication (no data)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/probe_flotu_public_auth.py"
+      - ".github/workflows/probe-flotu-public-auth.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Requests
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Check syntax
+        run: python -m py_compile tools/probe_flotu_public_auth.py
+      - name: Inspect public Flotu JS and probe status codes only
+        run: python -u tools/probe_flotu_public_auth.py | tee flotu-auth-probe.txt
+      - name: Preserve sanitized results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flotu-auth-probe
+          path: flotu-auth-probe.txt
+          retention-days: 7
