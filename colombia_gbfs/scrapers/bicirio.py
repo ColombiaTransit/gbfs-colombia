@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from urllib.parse import urlsplit
 
 import requests
@@ -30,8 +31,37 @@ MAX_STATIONS = 40
 MAX_BICYCLES = 250
 MAX_BYTES = 256_000
 BOUNDS = {"south": 5.9, "north": 6.4, "west": -75.7, "east": -75.1}
-# API has a group of different stations sharing identical coordinates.
-# Publish only one point per location pending independently verified fixes.
+# Public map markers published by the operator on its BiciRio system page:
+# https://somosmovilidad.gov.co/somos-mapa/leaflet-routing-machine-3.2.12/examples/index.js
+# Source: official Leaflet L.marker([latitude, longitude]) values, reviewed
+# 2026-11-19. These are station coordinates, NOT real-time API availability.
+# The public BiciRio API incorrectly duplicates multiple coordinates, so this
+# operator-provided independent map has priority for known station names.
+OFFICIAL_MAP_COORDINATES = {
+    "el faro": (6.1412796, -75.3770481),
+    "la cuarta": (6.150792, -75.392205),
+    "los edificios": (6.149323, -75.385319),
+    "san antonio": (6.130296, -75.3804),
+    "plaza de la libertad": (6.153696, -75.373764),
+    "san francisco": (6.154190, -75.372542),
+    "san nicolas": (6.146392, -75.379080),
+    "palos verdes": (6.126285, -75.383984),
+    "cuatro esquinas": (6.153292, -75.362879),
+    "el porvenir": (6.146621, -75.386334),
+    "unidad deportiva": (6.146114, -75.374173),
+    "santa ana": (6.15135, -75.36912),
+    "el hospital": (6.158937, -75.370605),
+    "porvenir 50": (6.1476775, -75.3893921),
+    "barro blanco": (6.153107, -75.408059),
+    "villa camila": (6.148877, -75.357714),
+    "quebrada arriba": (6.157583, -75.375444),
+    "zona franca": (6.157769, -75.412286),
+}
+# Documented spelling differences between operator map and current API.
+MAP_NAME_ALIASES = {
+    "edificios": "los edificios",
+    "hospital": "el hospital",
+}
 UNUSABLE_NAMES = {"virtual", "bodega", "centro de operaciones"}
 
 
@@ -50,6 +80,30 @@ def corrected_coordinates(record):
     if _inside(b, a):
         return float(b), float(a)
     return None
+
+
+def _normalized_name(name):
+    if not isinstance(name, str):
+        return ""
+    ascii_name = "".join(
+        ch for ch in unicodedata.normalize("NFKD", name.casefold())
+        if not unicodedata.combining(ch)
+    )
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", ascii_name).split())
+
+
+def station_coordinates(record):
+    """Prioritize the operator's independent public map; use valid API data only as fallback."""
+    key = _normalized_name(record.get("name"))
+    canonical = MAP_NAME_ALIASES.get(key, key)
+    known = OFFICIAL_MAP_COORDINATES.get(canonical)
+    if known is not None:
+        if not _inside(*known):
+            raise ValueError("Invalid coordinates in official BiciRio map reference")
+        return known
+    # A previously unseen station is not on the snapshot of the official
+    # map; use the source if its coordinates are valid, without guessing.
+    return corrected_coordinates(record)
 
 
 def _public_id(value):
@@ -125,7 +179,7 @@ class BiciRio(BikeShareSystem):
 
     @staticmethod
     def _eligible(records):
-        """Filter unlocated/internal stations and duplicated coordinates."""
+        """Filter internal stations and resolve positions from the official map first."""
         if len(records) > MAX_STATIONS:
             raise ValueError("Unexpectedly large BiciRio station roster")
         eligible = []
@@ -143,18 +197,18 @@ class BiciRio(BikeShareSystem):
                 raise ValueError("Duplicate BiciRio station ID")
             seen_ids.add(uid)
             name = _text(record.get("name"))
-            if not name or name.lower() in UNUSABLE_NAMES:
+            if not name or _normalized_name(name) in UNUSABLE_NAMES:
                 continue
             # TYPE_3 is used for the internal/virtual class in observed data.
             if record.get("stationType") == "TYPE_3":
                 continue
-            coords = corrected_coordinates(record)
+            coords = station_coordinates(record)
             if coords is None:
                 LOG.warning("Skip BiciRio station %s: invalid position", uid)
                 continue
             key = tuple(round(p, 6) for p in coords)
             if key in seen_coordinates:
-                LOG.warning("Skip BiciRio station %s: reused coordinates", uid)
+                LOG.warning("Skip BiciRio station %s: reused coordinates after map reconciliation", uid)
                 continue
             seen_coordinates.add(key)
             eligible.append((record, coords))
