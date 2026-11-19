@@ -146,3 +146,19 @@ APK SHA-256:
 A public web retrieval attempt for the four `/api/stations` URLs could **not** retrieve a usable response. No HTTP status code, JSON station response, current inventory or anonymous-access status was verified. **Do not report an HTTP 200/401 or working GBFS source** until a real HTTP test succeeds.
 
 **Next bounded action:** check HTTP GET status and (only on HTTP 200) the non-personal station JSON structure for these four endpoints. One reusable adapter can then cover the four tenants with separately configured hosts **if** the public response schema matches and is appropriate for redistribution. Avoid another APK download or an emulator for this step. The apps' presence is not proof that these institutional fleets remain active in November 2026.
+
+
+## User-run API DNS tests — 2026-11-19
+
+The user tested the four APK-derived HTTPS station endpoints from Windows PowerShell. **All four failed DNS resolution (host unknown), before any HTTP response could be received**:
+
+| Endpoint | User-observed result |
+| --- | --- |
+| `https://www.sambienteurkubici.com/api/stations` | Host unknown |
+| `https://stransitourkubici.co/api/stations` | Host unknown |
+| `https://www.ucooperativaurkubici.com/api/stations` | Host unknown |
+| `https://www.marianaurkubici.com/api/stations` | Host unknown |
+
+These are DNS failures, **not HTTP 401, HTTP 404 or empty JSON**. They do not independently prove that all institutional bicycle programs are discontinued. All four APK-configured hosts may be obsolete, migrated or temporarily unavailable; no working replacement hostname is confirmed.
+
+**Decision:** pause further probes and APK work for these four legacy tenants. Do not create/enable a GBFS adapter or publish synthetic station availability. Revisit only when Bicycle Capital / a participating institution supplies a current, resolvable, publicly readable station-data endpoint or other contemporary evidence of an active backend. Retain APK hostnames as historical technical evidence, not operational source URLs.
