@@ -48,7 +48,7 @@ npx wrangler deploy
 npx wrangler secret put PROXY_TOKEN
 ~~~
 
-Wrangler prompts for the secret rather than placing it in the repo. The default config uses **Workers Free** and does not force a placement region.
+Wrangler prompts for the secret rather than placing it in the repo. The config uses **Workers Free** and sets an experimental **host-based placement hint** for `webapp.metropol.gov.co`; it still does not guarantee any country's egress IP.
 
 ## Interpreting the diagnostic
 
@@ -96,13 +96,36 @@ the original data center; Smart Placement is an optimization, not an
 IP-country guarantee. Documentation:
 https://developers.cloudflare.com/workers/configuration/placement/
 
-For a more controlled follow-up, Cloudflare also offers an
-**experimental** explicit host placement hint
-(`"placement": { "hostname": "webapp.metropol.gov.co" }` in
-`wrangler.jsonc`), but this requires a redeployment via Wrangler and
-still does **not** guarantee a Colombian egress address. The existing
-Worker is intentionally left unchanged, so the deployed baseline can
-be compared with the Smart Placement test.
+**Smart Placement retest (2026-11-19):** User reported the same result
+after enabling Smart Placement: still blocked (HTTP 403). The precise
+new diagnostic fields were not shared, so do not assume its egress IP
+or Worker execution location changed or stayed the same.
+
+**Next: targeted Service/Hostname Placement.** The repository
+`wrangler.jsonc` now specifies:
+```json
+"placement": {
+  "hostname": "webapp.metropol.gov.co"
+}
+```
+This is not deployed automatically. The user may instead change
+the existing Cloudflare Worker in its dashboard:
+**Workers & Pages > [Worker] > Settings > General > Placement**,
+choose **Service / Hostname** (the UI label may vary), and enter
+`webapp.metropol.gov.co` (no protocol or path). Save/deploy the
+configuration, then rerun `GET /diagnose` with the bearer secret.
+Do not enable **Smart** and **Service** concurrently.
+
+Alternatively use `cd workers/encicla && npx wrangler deploy`
+after authenticating with `npx wrangler login`, reusing the existing
+Worker name. Retain the existing Cloudflare secret `PROXY_TOKEN`;
+do not add it to the repository.
+
+Host-based placement is experimental and uses HTTP HEAD latency
+probes to locate the target. It is intended for single-homed
+servers, not replicated/CDN/anycast hosts, and does **not**
+guarantee a Colombian source IP. See official Cloudflare docs:
+https://developers.cloudflare.com/workers/configuration/placement/
 
 If EnCicla continues to return HTTP 403, **do not** repeatedly probe
 the endpoint or adjust request headers to imitate a browser. Seek
