@@ -197,3 +197,64 @@ removed obsolete duplicate one-time schedules. An empty but otherwise
 valid public result no longer sends false failure notifications;
 actual upstream API or parse errors still fail. The public
 station/script research workflow remains manual.
+
+## Breakthrough: public bicycle records returned on 2026-11-19
+
+Manual research run:
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44509243002
+
+- **Successful at 10:50 UTC / 05:50 Colombia time**, before the
+  planned 08:00–12:00 research window (and shortly before the
+  operator's published 06:00 weekday start).
+- The publicly accessible stations endpoint returned **18 records**.
+  **12 open, geolocated, non-depot stations** were selected for
+  read-only bicycle API checks.
+- **9 of 12** checked stations returned nonempty bicycle arrays:
+  **16 bicycle objects total**. No bicycle API request failed.
+- All **12 checked stations** reported `connectionState=true`. This
+  differs from the earlier 2026-11-15 sample where all 18 stations
+  reported `false`. Exact semantics remain unverified.
+- Coordinate classification in the 18 station records: **16 swapped**,
+  **1 correct**, **1 invalid/unknown**.
+- Nonempty bicycle objects have the fields `bicycleState`,
+  `details`, `id`, `model`, `registerDate`, `serial`,
+  `stationName`. **Only field names and aggregate counts were
+  retained; not bicycle IDs, serials, or per-bike values.**
+- **TLS certificate chain is still not verifiable** from GitHub Actions.
+  The research-only exception is **not** suitable for production.
+
+### Station-by-station object counts (NOT confirmed rentable bikes)
+
+| Station ID | Name | State | Connection | Bike objects |
+| --- | --- | --- | --- | ---: |
+| 21 | El Faro | Open | true | 1 |
+| 22 | Villa Camila | Open | true | 3 |
+| 23 | San Francisco | Open | true | 1 |
+| 24 | Porvenir 50 | Open | true | 2 |
+| 25 | Barro Blanco | Open | true | 0 |
+| 26 | Unidad Deportiva | Open | true | 2 |
+| 27 | Santa Ana | Open | true | 2 |
+| 28 | Hospital | Open | true | 0 |
+| 29 | San Nicolas | Open | true | 2 |
+| 30 | Los Edificios | Open | true | 2 |
+| 32 | El Porvenir | Open | true | 1 |
+| 33 | Plaza de la Libertad | Open | true | 0 |
+| | **Total** | | | **16** |
+
+Full aggregate-only report:
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44509243002/artifacts/14520498523
+(artifact retention: 7 days).
+
+**Significance:** This conclusively demonstrates that BiciRio's
+unauthenticated read-only per-station endpoint sometimes returns bike
+objects. Previous empty results were temporary observations and must
+not be treated as proof the endpoint is unusable.
+
+**Still not GBFS-ready:** Inspect public, non-personal values of
+`bicycleState` (prefer a non-identifying aggregate distribution) to
+determine which count as rentable, independently verify ambiguous
+station coordinates and missing public stations, and fix the upstream
+TLS certificate chain. Confirm permission for data redistribution
+before enabling the scraper. **Do not activate the network solely
+because the endpoint returned 16 objects.**
+
