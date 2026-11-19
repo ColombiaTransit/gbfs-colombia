@@ -1,7 +1,7 @@
 # Rueda por Ibagué — source and feasibility register
 
 Status: **research only / no scraper enabled**  
-Checked: 2026-11-15  
+Checked: 2026-11-19  
 Proposed PyBikes network tag: `rueda-por-ibague` (not registered yet)  
 Operator: INFIBAGUÉ (Instituto de Financiamiento, Promoción y Desarrollo de Ibagué)  
 Location: Ibagué, Tolima, Colombia  
@@ -50,7 +50,7 @@ The source describes a dockless smart-lock model with designated return stations
 - [ ] Inspect the **public website's** HTML/JavaScript network requests and identify its data API, if any.
 - [ ] Check for a published official GBFS/open-data endpoint before reverse-engineering.
 - [ ] Determine whether public map data is accessible **without account login**.
-- [ ] If needed, statically examine the public Android APK for non-secret domain and endpoint references; do not collect real user tokens, identity documents, or private ride history.
+- [x] Statically examine user-supplied XAPK v2.0.1 for domain and endpoint references (see 2026-11-19 results below); no user credentials collected.
 - [ ] Record anonymized example of public station response and field mapping.
 - [ ] Resolve current Saturday opening hours and station IDs/coordinates.
 - [ ] Verify redistribution terms or request permission from INFIBAGUÉ.
@@ -74,3 +74,17 @@ The source describes a dockless smart-lock model with designated return stations
 - Additional potentially relevant official domain appears in the iOS listing metadata: `https://ruedaporibague.gov.co/`. This is **not yet confirmed to expose a public map/API** and should be checked as a separate public-web investigation.
 - Next reproducible step: obtain an APK through a legitimate downloadable source or a user-provided APK file, verify package/version/hash, then perform static manifest/DEX/resource inspection for non-secret public availability endpoints. Never upload an APK binary to the repo or log credentials.
 - **No API endpoint or public GBFS availability was confirmed by this APK attempt.**
+
+## User-provided XAPK and access tests — 2026-11-19
+
+**Research status: paused — authenticated API identified, no public read-only station feed verified.** Do not activate a scraper or keep repeating APK acquisition attempts.
+
+- User supplied `Rueda+por+Ibagué_2.0.1_APKPure.xapk` (version 2.0.1). This supersedes the previous need to obtain an APK; avoid redundant downloads, emulator setup, and geographic egress experiments.
+- Preliminary static-analysis findings reported in the investigation: Flutter Android application; production base URL `https://api.ruedaporibague.gov.co/api/v1`; Keycloak realm `https://auth.ruedaporibague.gov.co/realms/rueda`, OAuth2 Authorization Code client `rueda-android`.
+- Candidate app endpoint paths: `/stations/summary-stations`, `/bikes/bikes`, `/bikes/bikes-types`, `/stations/workshift-schedules`. App model/field hints include `stationGuid`, `latitude`, `longitude`, `capacity`, `totalBikes` and bicycle status `Disponible`. These are **static-analysis leads**, not confirmed public response schemas.
+- User ran anonymous HTTP requests from the Netherlands against `GET /stations/summary-stations` and `GET /bikes/bikes-types`. **Both returned HTTP 401 Unauthorized**. This confirms the target host responds and rejects anonymous requests to these routes; it does *not* prove all station information is unavailable anonymously.
+- Android app is region-restricted for installation from the Netherlands. User cannot install via the local Play Store. Do not make installation, emulator, VPN or Colombian VPS prerequisites for continuing the project.
+- Previously referenced station coverage URL `https://ruedaporibague.gov.co/estaciones-y-cobertura/` returns HTTP 404 (user verified). Retain the 2026-10-28 INFIBAGUÉ operator article as the current network scope source.
+- No verified live station IDs, coordinates, bicycle availability counts, access token or redistribution permission has been obtained. The mobile app's private/authenticated routes must not be treated as an open GBFS data source.
+
+**Deferred only if revisited:** check the public `ruedaporibague.com` dashboard for a separate anonymous read-only map source, or ask the operator for documented public access / service credentials with redistribution permission. Do not collect rider credentials or publish private tokens. Next investigation priority: **MegaBici Pereira**, using its existing register to avoid repeating its earlier research.
