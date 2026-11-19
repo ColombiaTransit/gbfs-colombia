@@ -114,3 +114,52 @@ admin-only resource endpoints.
 
 **Decision:** Keep as **high-priority research lead**, not production
 GBFS-ready. No active scraper or recurring polling job is justified yet.
+
+
+## Full static JavaScript route inventory (2026-11-19)
+
+Read-only GitHub Actions inspection of the **exact** public JS files:
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44523641674
+
+- Marketing site:
+  https://flotu.com/_components/v2/063be6fa5f4d16053ad380e52e6be66c9ee71bef.js
+  (1,549,277 bytes; 9,266 analyzed JS string literals)
+- Admin console:
+  https://app.flotu.com/main.605db60a5b2b7808.js
+  (616,105 bytes; 2,619 analyzed JS string literals)
+- Static analysis only, **no authenticated or unauthenticated API
+  endpoints were invoked** and no account, payment or rider data
+  was retrieved.
+
+The marketing bundle contains these relevant URL/route references:
+- \`https://app.flotu.com/api/v1\` — apparent API base
+- \`/admin/login\` — website or administration route, not proven API
+- \`/alquilar\` — public rental/website route, not proven API
+- Several local marketing image assets associated with the customer
+  rental app, operator map and fleet-manager dashboards — **not APIs**.
+
+The administration JS contains **27 unique route/API-like strings**
+(including \`/api/v1\`, \`/login\`, and a \`https://app.flotu.com\`
+base reference). Relevant groups:
+
+| Area | Literal strings found |
+| --- | --- |
+| Vehicle inventory | \`/vehicles\`, \`/vehicles/\${F}\`, \`/vehicles/categories\` |
+| User records | \`/users\`, \`/users/\${F}\` |
+| Operator records | \`/operators\`, \`/operators/\${F}\`, \`/operators/stats\` |
+| Payments | \`/payments\`, \`/payments/\${F}\`, \`/payments/stats\` |
+| Auth | \`/auth/login\`, \`/auth/logout\`, \`/auth/register\`, \`/auth/profile\`, \`/auth/refresh\`, \`/auth/token/refresh\`, \`/auth/forgot-password\`, \`/auth/reset-password\` |
+| Leaderboards | \`/leaderboards/local/riders\`, \`/leaderboards/admin/riders\`, \`/leaderboards/admin/progression/riders\`, \`/leaderboards/admin/set-rider-score\`, \`/leaderboards/admin/simulate-rider\` |
+| Bases/frontend | \`/api/v1\`, \`/login\`, \`https://app.flotu.com\` |
+
+The \`\${F}\` interpolation is an internal minified-JS variable,
+likely a record identifier, not a literal path segment. The static
+inventory **does not establish HTTP methods, authorization rules or
+working route responses**: some strings may denote frontend routing.
+No explicit station availability, anonymous bike-count or GBFS
+endpoint was found in these two specific bundles.
+
+**Next sensible action:** look for an officially exposed **read-only
+public** vehicle/station availability endpoint or ask Flotu to provide
+a public feed. Do not probe the administrator's user/payment/operator
+routes or assume \`/vehicles\` is anonymously accessible.
