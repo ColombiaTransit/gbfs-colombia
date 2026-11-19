@@ -258,3 +258,69 @@ TLS certificate chain. Confirm permission for data redistribution
 before enabling the scraper. **Do not activate the network solely
 because the endpoint returned 16 objects.**
 
+
+
+## TLS chain verified independently from a GitHub Ubuntu runner (2026-11-19)
+
+A dedicated **read-only TLS handshake** (no user data, credentials or
+certificate verification bypass) confirmed the difference between the
+browser's valid leaf certificate and the certificate chain the server
+actually presents:
+
+- Diagnostic action:
+  https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44510522405
+- Runner: Ubuntu 26.04, OpenSSL 3.5.5, default CA store with 120 CA certs.
+- `openssl s_client -connect bicirio.somosmovilidad.gov.co:443
+  -servername bicirio.somosmovilidad.gov.co -showcerts
+  -verify 5 -verify_return_error` received **ONE certificate only**:
+  the leaf `CN=bicirio.somosmovilidad.gov.co`, issued by
+  **Go Daddy Secure Certificate Authority - G2**.
+- OpenSSL: **exit code 1**, `Verify return code: 20
+  (unable to get local issuer certificate)`.
+- Python standard-library HTTPS: `SSLCertVerificationError`,
+  **verify code 20**.
+- `curl --head` (default certificate verification): **exit code 60**.
+- User's Windows browser certificate viewer showed the leaf cert
+  valid from **2025-11-16** to **2026-12-18**. This establishes
+  expiration/issuer information about the leaf, **not** that the
+  server transmits its missing intermediate certificate.
+
+**Diagnosis:** The observed TLS server response omits the
+intermediate CA certificate required by these Linux trust chains.
+Browsers may fill in an intermediate from their certificate cache
+or AIA fetching. Ask the operator to configure the correct
+server certificate **fullchain** (leaf + appropriate intermediate,
+with trusted root already on the client). Do not disable TLS
+verification in a production GBFS scraper. Different edge/server
+nodes could behave differently; the result is from GitHub's runner.
+
+## Public bicycleState category investigation (2026-11-19)
+
+An additional bounded aggregate-only research run succeeded:
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44510927092
+
+- Local unit tests: **9 passed**.
+- **18** stations returned, **12** eligible stations checked.
+- **9** stations returned nonempty public bicycle arrays.
+- **16** bicycle objects total, with **all 16** reporting
+  **`bicycleState = "Ready"`** (no other state values observed).
+- This observation was at **11:01 UTC / 06:01 Colombia time**,
+  shortly after the reported weekday opening time.
+- The research output only contains short aggregate state
+  categories, not bike identifiers, serial numbers, timestamps,
+  individual locations or user/rider data.
+- Field semantics are **not yet formally verified**:
+  `Ready` plausibly denotes a rentable bike, but requires
+  confirmation from an official UI example or operator documentation;
+  do not silently count all objects as GBFS rentable.
+- The two previously identified public frontend JS bundles were
+  inspected without authentication. Only the public station marker
+  label `bikeCount bicicletas disponibles` was found near the
+  status search, **not** a mapping that explicitly defines the
+  `Ready` bicycle enumeration.
+
+The observed `Ready` state is a strong lead for implementing a
+candidate parser behind tests. **No production GBFS activation yet:**
+the missing TLS intermediate, ambiguous/duplicated coordinates,
+operator's public station roster discrepancy and explicit
+availability semantics should be resolved first.
