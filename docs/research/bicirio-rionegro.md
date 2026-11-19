@@ -324,3 +324,53 @@ candidate parser behind tests. **No production GBFS activation yet:**
 the missing TLS intermediate, ambiguous/duplicated coordinates,
 operator's public station roster discrepancy and explicit
 availability semantics should be resolved first.
+
+
+## Verified against the official public web-map JavaScript (2026-11-19)
+
+**Source:** the public minified Angular/OpenLayers bundle
+`https://bicirio.somosmovilidad.gov.co/chunk-LJOODKNY.js`
+and its root bundle `main-YSAWJGXJ.js`.
+Targeted static-source inspection:
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44514095468
+
+The map's `_loadStationsAndBikes` calls
+`getAllStationsFreeAccess()`, then `_fetchBikesForStations` makes
+`getBikesByStationFreeAccess(station.id)` requests for each returned
+station. The **actual publicly served JS** then calculates:
+
+```javascript
+getBikesByStationFreeAccess(o.id).pipe(
+  map(s => ({ station: o, bikes: s.length || 0 }))
+)
+```
+
+The map builds station markers with the resulting `bikeCount` and
+its popup labels that field **`bicicletas disponibles`**.
+**There is no frontend filter on `bicycleState` in this display path.**
+
+**Meaning for initial GBFS implementation:** The website-derived
+station count is simply the *length of the public bicycle array per
+station*. This is exactly reproducible from the anonymous endpoint;
+there is no reason to invent a `Ready` filter to match the website.
+The 2026-11-19 aggregate sample had **16 records, all `Ready`**,
+so counting all records or those `Ready` coincided *in that sample*.
+
+**Important limitation:** The frontend not filtering does **not**
+prove that the upstream endpoint lacks its own state filtering, nor
+that an unfamiliar non-`Ready` state would represent a rentable
+bicycle. If non-`Ready` states appear, log only aggregated categories,
+do not silently treat them as rentable without evidence; investigate
+the source semantics first. Also avoid fabricating zero bikes when
+an endpoint fails.
+
+The same JS `getStyleForState(name, state)` maps the **station**
+state `Open` to a normal marker, `Closed` to a closed/loaned marker,
+`On_Maintenance` to maintenance, and `Virtual` to a special marker.
+**Station `state` and bicycle `bicycleState` are distinct**; do
+not substitute the former for bicycle availability.
+
+This resolves the specific frontend/availability-count question,
+but does **not** resolve the independent TLS fullchain and
+coordinate-quality problems. The active GBFS scraper is still
+deferred pending those safeguards.
