@@ -109,10 +109,10 @@ docker compose up -d
 The `bicirio-rionegro` plugin is implemented at
 [`colombia_gbfs/scrapers/bicirio.py`](colombia_gbfs/scrapers/bicirio.py),
 registered in `config/scrapers.json`, and covered by offline tests.
-A one-off, **non-publishing** live run on 2026-11-19 succeeded:
-**14** conservatively geolocated public station records, **20** public
-bicycle objects, **12** stations reporting online. These are a single
-snapshot, not permanent network totals.
+The corrected, **non-publishing** live run on 2026-11-19 succeeded:
+**16** public API stations geolocated against the operator map,
+**26** bicycle objects and **13** stations reporting online.
+These are a single snapshot, not permanent network totals.
 
 - Operator data: only the two known public, unauthenticated
   `/api/v1/free_access/{stations,bicycles}` GET endpoints.
@@ -120,10 +120,13 @@ snapshot, not permanent network totals.
   The currently observed `bicycleState` is `Ready`; unknown future
   states cause a visible scraper error rather than silently counting
   potentially unavailable bikes.
-- Station positions: per-record latitude/longitude orientation checks;
-  invalid/internal stations and conflicting coordinates are excluded,
-  not published at an invented location. Station identifiers are stable
-  and independent of coordinates.
+- Station positions: all **18** coordinates from the operator's public
+  Leaflet map are embedded as name-matched reference locations. This
+  resolves the API's El Faro/Porvenir 50/La Cuarta duplication; the 16
+  currently known public API station records all have unique positions.
+  Unknown names use strictly validated source coordinates only; the
+  internal/virtual API records remain excluded. Station identifiers are
+  stable and independent of coordinates.
 - Station operations: `state=Open` and `connectionState=true`
   indicate online for this initial implementation. No made-up
   dock capacities or bike identifiers are published. Failed upstream
@@ -133,9 +136,11 @@ snapshot, not permanent network totals.
   from GoDaddy, fingerprint-checked, and included in a **BiciRio-only
   Requests CA bundle**. Normal hostname and certificate verification
   remain enabled. The system-wide trust store is not modified.
-- **Not enabled by default** because official public station roster
-  and source coordinates differ, and data redistribution terms should
-  be confirmed before publishing.
+- **Not enabled by default**: the map lists 18 named locations but two
+  of them (Quebrada Arriba and Zona Franca) are not in the current
+  anonymous station API; no fake availability is published for those.
+  Redistribution terms and service-status semantics should also be
+  confirmed before publishing.
 
 To opt in after reviewing the outstanding source/permission questions,
 edit `.env`:
