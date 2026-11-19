@@ -163,3 +163,67 @@ endpoint was found in these two specific bundles.
 public** vehicle/station availability endpoint or ask Flotu to provide
 a public feed. Do not probe the administrator's user/payment/operator
 routes or assume \`/vehicles\` is anonymously accessible.
+
+
+## Anonymous route/authentication probe (2026-11-19)
+
+**User-requested limited investigation**, using public admin JS inspection
+and unauthenticated **GET/HEAD** requests with redirects disabled.
+No login, bypass, credentials, user records, vehicle identifiers,
+locations, payment details, or individual vehicle payloads were
+recorded. The bounded final probe read the API JSON only in memory
+to report aggregate array length and top-level field names.
+
+- Static inspection and initial status probe:
+  https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44524458286
+- Trailing-slash and final shape-only probe:
+  https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44524906578
+- Test script: \`tools/probe_flotu_public_auth.py\`
+- Exact publicly served JS analyzed:
+  \`https://app.flotu.com/main.605db60a5b2b7808.js\`
+
+### What the public admin JS actually says
+
+The bundle contains an HTTP interceptor that obtains
+\`authService.getAccessToken()\` and, when present, appends
+\`Authorization: Bearer <token>\` to requests. Token refresh logic
+uses \`flotu_admin_refresh_token\`. Its dashboard route guard checks
+\`authService.isAuthenticated()\` and \`authService.canAccessAdmin()\`;
+non-authenticated users are redirected to \`/login\`. These are
+**strong evidence that the admin interface is authenticated**;
+they do not independently prove that **every** backend route rejects
+anonymous GETs.
+
+### Exact anonymous HTTP results
+
+| Status-only request | Result |
+| --- | --- |
+| \`HEAD /api/v1/vehicles\` | 301 redirect to trailing slash |
+| \`GET /api/v1/vehicles\` | 301 redirect to trailing slash |
+| \`HEAD /api/v1/vehicles/\` | **200 application/json** |
+| \`GET /api/v1/vehicles/\` | **200 application/json** |
+| \`HEAD /api/v1/vehicles/categories\` | 301 redirect to trailing slash |
+| \`GET /api/v1/vehicles/categories\` | 301 redirect to trailing slash |
+| \`HEAD /api/v1/vehicles/categories/\` | **404 application/json** |
+| \`GET /api/v1/vehicles/categories/\` | **404 application/json** |
+
+Final bounded, shape-only inspection of **unauthenticated**
+\`GET https://app.flotu.com/api/v1/vehicles/\` showed the
+top-level fields **\`count\`, \`next\`, \`previous\`, \`results\`**.
+The \`results\` value was a JSON list with **0 records**.
+No error key was present. The aggregate \`count\` field's value
+was not recorded; no contents of vehicle records were output.
+
+**Interpretation:** The apparent vehicle listing route does not
+universally return HTTP 401/403 to anonymous callers. But the only
+anonymous snapshot yielded **no vehicle records**, so no public
+rentable stock, GBFS feed or station-based availability can currently
+be established. A zero-length \`results\` array does **not**
+demonstrate that the operator has zero inventory; filtering,
+account permissions, data availability and route semantics remain
+unresolved.
+
+**Decision:** Do not activate a Flotu scraper or infer that the
+admin endpoint is a usable public feed. If revisited, prioritize
+the actual public *customer* app or an operator-provided,
+read-only availability feed. Avoid mining private/admin inventory.
