@@ -63,3 +63,14 @@ The source describes a dockless smart-lock model with designated return stations
 - The existence of real-time functionality in the mobile apps **does not prove a publicly accessible API**.
 - No undocumented URLs, credentials, station coordinates or live bike counts should be invented.
 - Keep discovery separate from the production runtime until tested; default system list stays `encicla,tembici-bogota`.
+
+## APK acquisition attempt — 2026-11-19
+
+- Static-only GitHub Actions workflow exists at `.github/workflows/research-ibague-apk.yml` with `tools/research_ibague_apk.py`.
+- Runs [44468234890](https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44468234890) and [44468338786](https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44468338786) **completed successfully as research jobs but did not download an APK**. Do not mislabel them as successful APK decompilation.
+- Uptodown download page `https://rueda-por-ibague.uptodown.com/android/descargar` responded with 157,873 bytes of HTML, but provided **zero directly extractable APK download links**. The page exposes a dynamic download button `detail-download-button` with `data-file-id=1069122012`; JavaScript `download.js` and Cloudflare Turnstile are present. No challenge bypass or unauthorized API access was attempted.
+- Uptodown lists **historical 1.0.9**, dated **2025-07-22**, APK size **37.79 MB**, SHA-256 `291e3e82032c4f0a759b7fc3ce67f7499ae3de1191fa117da9eda6b7fb3711cc`. This is **not** the latest Play Store release.
+- Google Play lists current app package `com.ruedaxibaguex`, version **2.0.0.1.50**, updated **2026-07-31**. Its listing explicitly advertises a station map and real-time bike availability. Source: https://play.google.com/store/apps/details?id=com.ruedaxibaguex
+- Additional potentially relevant official domain appears in the iOS listing metadata: `https://ruedaporibague.gov.co/`. This is **not yet confirmed to expose a public map/API** and should be checked as a separate public-web investigation.
+- Next reproducible step: obtain an APK through a legitimate downloadable source or a user-provided APK file, verify package/version/hash, then perform static manifest/DEX/resource inspection for non-secret public availability endpoints. Never upload an APK binary to the repo or log credentials.
+- **No API endpoint or public GBFS availability was confirmed by this APK attempt.**
