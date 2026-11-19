@@ -122,3 +122,27 @@ institutional identity records or rider histories were accessed.
 **Decision:** No active scraper, no container build and no periodic
 research Action are justified yet. Retain for future provider/API
 follow-up.
+
+
+## Four user-provided Android APKs — static comparison, 2026-11-19
+
+Four uploaded APKs were inspected locally as ZIP/DEX files. **No installation, emulator, authentication or personal data collection was required.** Their Java/Dalvik implementations share a common API path pattern, but the domain is separately configured for each institution.
+
+| APK variant | File version | Production base/host found as a DEX string | Station endpoint (embedded literal) |
+| --- | --- | --- | --- |
+| Secretaría de Gestión Ambiental | 1.3 | `https://www.sambienteurkubici.com` | `https://www.sambienteurkubici.com/api/stations` |
+| Secretaría de Tránsito | 1.11 | `https://stransitourkubici.co` | `https://stransitourkubici.co/api/stations` |
+| Universidad Cooperativa de Colombia (UCC Pasto) | 1.4 | `https://www.ucooperativaurkubici.com` | `https://www.ucooperativaurkubici.com/api/stations` |
+| Universidad Mariana | 1.2 | `https://www.marianaurkubici.com` | `https://www.marianaurkubici.com/api/stations` |
+
+Other common paths confirmed in all four DEX builds: `/api/login`, `/api/register`, `/api/rides`, `/api/profile`, `/api/profile/update`, `/api/report`, `/api/openLock`; a `NearbyStationsFragment`, `Station` model, and `URL_STATIONS` identifier are present. A legacy `http://bogotabikesharing.co/api/openLock` string is also shared, but is **not evidence of the current station data host**. User-specific operations (profile, rides, unlock) are out of scope for anonymous GBFS.
+
+APK SHA-256:
+- Gestión Ambiental 1.3: `a750e567a35fa5eb69781c42937ee8c06c1e95da6dea3fb569ac1217a61439a5`
+- Tránsito 1.11: `4f26ecee80534d682b5afa4febf1160d04c3a21d05b913c48e4235a757f471e6`
+- UCC 1.4: `5e2fe564e2bdd52afeb576a99c1c594a6cb56e8c49701e76ebc866560a4c11ff`
+- Mariana 1.2: `e529d1cb6414b3290f33d62a933394abbb509c33d9ac393838d3a2ad4ba28baa`
+
+A public web retrieval attempt for the four `/api/stations` URLs could **not** retrieve a usable response. No HTTP status code, JSON station response, current inventory or anonymous-access status was verified. **Do not report an HTTP 200/401 or working GBFS source** until a real HTTP test succeeds.
+
+**Next bounded action:** check HTTP GET status and (only on HTTP 200) the non-personal station JSON structure for these four endpoints. One reusable adapter can then cover the four tenants with separately configured hosts **if** the public response schema matches and is appropriate for redistribution. Avoid another APK download or an emulator for this step. The apps' presence is not proof that these institutional fleets remain active in November 2026.
