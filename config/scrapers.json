@@ -1,1 +1,17 @@
-[]
+[
+  {
+    "tag": "bicirio-rionegro",
+    "module": "bicirio",
+    "class": "BiciRio",
+    "meta": {
+      "name": "BiciRio",
+      "city": "Rionegro",
+      "country": "CO",
+      "latitude": 6.152,
+      "longitude": -75.374,
+      "company": [
+        "SOMOS Movilidad Rionegro S.A.S."
+      ]
+    }
+  }
+]
