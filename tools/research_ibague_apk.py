@@ -40,6 +40,11 @@ class LinkParser(HTMLParser):
         if tag in ("a", "button", "form", "script"):
             self.links.append((tag, a))
 
+class LinkParserWithScripts(LinkParser):
+    def __init__(self,html):
+        super().__init__()
+        self.feed(html)
+
 def safe_url(raw):
     p = urlparse(raw)
     if p.scheme not in {"http", "https"} or not p.hostname:
@@ -182,6 +187,17 @@ def main():
             print("Uptodown HTML bytes:",len(html))
             print("Download candidates:",len(candidates),"hosts:",report["candidate_download_hosts"])
             print("Download-related HTML signals:",json.dumps(diagnostics,ensure_ascii=False)[:4000])
+            for needle in ("detail-download-button","1069122012","download-post","downloadUrl","download-url","dw.uptodown","button download"):
+                matches=list(re.finditer(re.escape(needle),html,re.I))
+                print("HTML marker",needle,"count",len(matches))
+                for m in matches[:2]:
+                    snippet=html[max(0,m.start()-180):m.end()+360].replace("\\n"," ")
+                    snippet=re.sub(r'(?:https?://)[^\\s"\\\']{100,}',"[long-url]",snippet)
+                    print("  context:",snippet[:550])
+            print("Same-origin script tags:",[
+                {"src":a.get("src","")[:170],"type":a.get("type","")}
+                for tag,a in LinkParserWithScripts(html).links if tag=="script" and a.get("src")
+            ][:35])
             attempts=[]
             for url in candidates[:6]:
                 try:
