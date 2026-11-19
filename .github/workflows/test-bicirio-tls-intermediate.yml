@@ -1,0 +1,27 @@
+name: Verify BiciRio TLS with GoDaddy intermediate
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/test_bicirio_tls_intermediate.py"
+      - ".github/workflows/test-bicirio-tls-intermediate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python Requests and CA roots
+        run: python -m pip install --disable-pip-version-check requests certifi
+      - name: Download official intermediate with verified HTTPS
+        run: |
+          curl --fail --show-error --silent --location --max-time 20 \
+            https://certs.godaddy.com/repository/gdig2.crt.pem \
+            --output godaddy-gdig2.crt.pem
+      - name: Compare strict default and augmented TLS verification
+        run: python -u tools/test_bicirio_tls_intermediate.py --intermediate godaddy-gdig2.crt.pem
