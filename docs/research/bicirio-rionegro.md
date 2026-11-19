@@ -1,6 +1,6 @@
 # BiciRio (Rionegro) — GBFS source investigation
 
-**State:** Research verified, public station API found; **do not enable live GBFS yet**  
+**State:** PyBikes adapter implemented and live dry-run verified; opt-in GBFS remains disabled by default  
 **Observed:** 2026-11-15 (Sunday), GitHub Actions runner  
 **Operator:** SOMOS Movilidad Rionegro S.A.S. / municipality of Rionegro, Antioquia, Colombia  
 **Candidate network tag:** `bicirio-rionegro` (not registered)  
@@ -374,3 +374,82 @@ This resolves the specific frontend/availability-count question,
 but does **not** resolve the independent TLS fullchain and
 coordinate-quality problems. The active GBFS scraper is still
 deferred pending those safeguards.
+
+
+## Implementation and successful real Docker dry-run (2026-11-19)
+
+**Code:**
+- `colombia_gbfs/scrapers/bicirio.py`
+- `config/scrapers.json` (registered `bicirio-rionegro` network)
+- `tools/build_bicirio_ca.py` (strict GoDaddy intermediate fingerprint pin)
+- `tests/test_bicirio.py` (11 offline tests)
+- `.github/workflows/bicirio-live-dry-run.yml`
+- `tools/smoke_bicirio_scraper.py`
+
+**Live validation run:**
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44517587529
+
+A real network read using the **published image with the validated
+GoDaddy G2 intermediate** succeeded at 2026-11-19 11:45 UTC.
+It did **not** publish a GBFS feed.
+
+| Measurement | Observed |
+|---|---:|
+| Safe station records emitted | **14** |
+| Unique stable station IDs | **14** |
+| Bicycle objects counted | **20** |
+| Station records with `state=Open` | **14** |
+| Station records marked online (`connectionState=true`) | **12** |
+| Free dock counts inferred or fabricated | **0** (`null`) |
+
+Notes:
+- The source API returns 18 station records, but the implementation
+  excludes internal/virtual records, invalid coordinates, and repeated
+  lat/lon points where stations conflict. For the initial station
+  snapshot two problematic station coordinates collide with an earlier
+  accepted station. Investigate and correct from independent official
+  coordinates before adding those stations.
+- The scraper uses **the same list-length count** as the official
+  `chunk-LJOODKNY.js` public map. The researched bicycle samples
+  were all `Ready`; if an unverified bicycle state later occurs,
+  the adapter fails closed, rather than publishing questionable counts.
+- The `online` signal requires `state=Open` and
+  `connectionState=true`. Station statuses are distinct from
+  bicycle statuses.
+- Custom `BiciRioStation.get_hash` guarantees stable station IDs
+  even when the original GPS positions change.
+- All API requests use a dedicated per-provider HTTPS session with
+  a purpose-built CA bundle and **normal verified TLS**. There is
+  **no `verify=False`**, system-wide CA trust change or global
+  PyBikes scraper mutation.
+- A complete snapshot is published only after every included station
+  bike request succeeds, avoiding partial/stale zero counts.
+- No individual bicycle serials, IDs, rider accounts or loan
+  records are logged or included in output.
+
+**Strict TLS tests:** Python standard library and Requests both
+received HTTP 200 and 18 stations after adding the verified,
+SHA-256-pinned GoDaddy intermediate:
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44515430517
+
+**Image build including adapter registration and tests:**
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44517050163
+
+**GHCR caveat:** the first smoke attempt
+https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44517464760
+failed at the **unauthenticated GHCR pull**, before running any scraper
+code. This was fixed by using the workflow's read-only `GITHUB_TOKEN`
+to sign in to `ghcr.io`; the follow-up run succeeded.
+
+**Outstanding before enabling default GBFS publication:**
+1. Verify the full public station roster, fix duplicated/missing
+   station positions and validate any source geocoordinate changes.
+2. Confirm operator data redistribution/usage conditions.
+3. Independently establish whether `connectionState` always reflects
+   rental availability, and whether all nonempty arrays are rentable.
+4. Verify opening hours for currently operating stations, including
+   atypical weekend/virtual station service.
+
+**Decision:** Implementation is functional, with a successful
+non-publishing live dry-run. Keep `ENABLED_NETWORKS` unchanged until
+the remaining operational and attribution issues are accepted.
