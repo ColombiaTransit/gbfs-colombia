@@ -104,3 +104,9 @@ https://www.pereira.gov.co/publicaciones/6252/en-2022-el-sistema-megabici-regist
 
 **Decision:** Store as active service but not scraper-ready. Do not
 activate `megabici-pereira` in the Docker deployment.
+
+## Targeted follow-up — 2026-11-19
+
+Following Rueda por Ibagué, existing MegaBici research was reviewed before doing any new work. A targeted search of current official Pereira/Instituto de Movilidad announcements, station maps, availability dashboards and documented API/GBFS sources **did not establish a public machine-readable station-availability endpoint**. The already-recorded 2026-11-05 reopening notice and 2026-11-10 fleet update remain the relevant current operational sources. Do not count 101 total bikes or planned 30/33 additions as live station inventories.
+
+**Decision:** No APK acquisition, emulator, reverse engineering or speculative endpoint probing is justified: the municipal service is staffed, and no rider-facing app exposing live station counts has been verified. The actionable dependency is operator confirmation of a public read-only aggregate station feed or permission for a simple export. Keep `megabici-pereira` off production GBFS until that exists. No need to repeat the existing seven-station/fleet research.
