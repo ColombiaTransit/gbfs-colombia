@@ -27,6 +27,12 @@ RUN pip install --no-cache-dir --upgrade pip \
        "git+https://github.com/citybikes/hyper.git@$HYPER_REF" \
        "git+https://github.com/citybikes/gbfs-api.git@$GBFS_API_REF"
 
+# Build a dedicated CA bundle for the BiciRio host. GoDaddy serves the
+# missing G2 intermediate over verified HTTPS. The helper pins its SHA256,
+# and only the BiciRio adapter will use the augmented CA bundle.
+COPY tools/build_bicirio_ca.py /tmp/build_bicirio_ca.py
+RUN python /tmp/build_bicirio_ca.py
+
 FROM python:3.12-slim-bookworm
 COPY --from=sqlite-build /usr/local/lib/ /usr/local/lib/
 COPY --from=python-build /opt/venv/ /opt/venv/
