@@ -1,0 +1,29 @@
+name: Test EnCicla Cloudflare Worker
+
+on:
+  push:
+    paths:
+      - "workers/encicla/**"
+      - ".github/workflows/test-encicla-worker.yml"
+  pull_request:
+    paths:
+      - "workers/encicla/**"
+      - ".github/workflows/test-encicla-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  worker-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax check
+        run: node --check workers/encicla/src/index.mjs
+      - name: Offline mock API tests
+        run: node --test workers/encicla/test/index.test.mjs
