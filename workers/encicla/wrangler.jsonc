@@ -4,5 +4,10 @@
   "main": "src/index.mjs",
   "compatibility_date": "2026-11-01",
   "workers_dev": true,
-  "observability": { "enabled": false }
+  "observability": {
+    "enabled": false
+  },
+  "placement": {
+    "hostname": "webapp.metropol.gov.co"
+  }
 }
