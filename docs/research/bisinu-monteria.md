@@ -1,7 +1,7 @@
 # Bisinú — Montería, Córdoba, Colombia
 
 Status: **research only; no validated public live data feed**
-Checked: 2026-11-15
+Checked: 2026-11-15; Android availability reconfirmed: 2026-11-19
 Candidate PyBikes tag: `bisinu-monteria` (not enabled)
 Location: Montería, Córdoba, Colombia
 Timezone: America/Bogota
@@ -34,9 +34,13 @@ Timezone: America/Bogota
 
 - Historical Android app package: `com.devdvs.bisinu.bisinu`.
   Link: https://play.google.com/store/apps/details?id=com.devdvs.bisinu.bisinu
-  - A third-party app index reported it was removed from Google Play
-    **2025-06-24**, which does not prove that the bike scheme ceased.
-  - Index: https://chrome-stats.com/d/com.devdvs.bisinu.bisinu
+  - **Removed from Google Play**: third-party app-history index records
+    delisting on **2025-06-24**, and the user confirmed on **2026-11-19**
+    that the Android app is no longer available. This is a confirmed
+    Android distribution status, **not proof that Bisinú has ceased**.
+  - Historical listing/index: https://chrome-stats.com/d/com.devdvs.bisinu.bisinu
+  - Do not recommend this Google Play URL as an installable app; keep
+    the package ID only for historical technical research.
 - iOS app:
   https://apps.apple.com/co/app/bisin%C3%BA/id1671247807
   - Publisher: Ingeniería, Desarrollo y Asesorías S.A.S. (IDEAS).
@@ -68,7 +72,7 @@ Timezone: America/Bogota
 | --- | --- |
 | Bike-sharing scheme | Confirmed historic, modernization planned in 2026 |
 | Old project domain | Unreachable at review |
-| Historic Android app | Listed by app indexes; reportedly delisted |
+| Historic Android app | **Removed from Google Play (2025-06-24; user reconfirmed 2026-11-19)** |
 | Historic iOS app | Still listed; latest version 2023 |
 | Public live station IDs/coordinates | Not confirmed |
 | Anonymous live bikes per station | Not confirmed |
@@ -83,7 +87,9 @@ data is unavailable.
 
 1. Establish whether the announced 2026 handover to
    **La Perla del Sinú** and the 20-station modernization completed.
-2. Identify the new provider's public app, dashboard or documented API.
+2. Identify whether a **replacement Android/iOS app**, public dashboard
+   or documented API was launched by the new operator. The legacy Android
+   package is no longer distributed through Google Play.
 3. Verify the actually active station roster, coordinates and
    bicycle/vehicle-type availability, without rider credentials.
 4. Confirm operating hours, update timestamps, attribution and
