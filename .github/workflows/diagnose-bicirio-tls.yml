@@ -1,0 +1,22 @@
+name: Diagnose BiciRio TLS certificate chain
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/diagnose_bicirio_tls.py"
+      - ".github/workflows/diagnose-bicirio-tls.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  tls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax check
+        run: python -m py_compile tools/diagnose_bicirio_tls.py
+      - name: Compare system Python, OpenSSL and curl TLS verification
+        run: python -u tools/diagnose_bicirio_tls.py
