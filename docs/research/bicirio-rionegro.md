@@ -3,7 +3,7 @@
 **State:** PyBikes adapter implemented, all 16 current public API stations geolocated using official map references; GBFS remains opt-in  
 **Observed:** 2026-11-15 (Sunday), GitHub Actions runner  
 **Operator:** SOMOS Movilidad Rionegro S.A.S. / municipality of Rionegro, Antioquia, Colombia  
-**Candidate network tag:** `bicirio-rionegro` (not registered)  
+**Network tag:** `bicirio-rionegro` (registered, not enabled by default)  
 **Country:** CO; time zone: `America/Bogota`
 
 ## Official sources
@@ -549,3 +549,34 @@ establish current service for additional named sites. Before default
 GBFS publication, operator redistribution conditions, station-hour
 accuracy and the semantics of station online status should still
 be reviewed. The adapter remains opt-in.
+
+## Research-phase closure — 2026-11-19
+
+**Research and initial implementation are closed for now.** The user
+approved stopping further BiciRio investigation after the public SOMOS
+JavaScript map resolved the station coordinate conflicts.
+
+- PyBikes adapter is registered and tested; Docker image build succeeded.
+- TLS validation works with the pinned GoDaddy G2 intermediate; no
+  certificate-verification bypass is used in production code.
+- Official SOMOS map positions resolve all **16** non-internal API
+  stations; two additional map-only station names are not fabricated
+  as live API stations.
+- Non-publishing live smoke test:
+  https://github.com/ColombiaTransit/gbfs-colombia/actions/runs/44520077780
+  (**16** stations, **26** bicycle records, **13** reporting online
+  at that specific snapshot).
+- Keep `bicirio-rionegro` **disabled by default** in
+  `ENABLED_NETWORKS`; the user has not requested production activation.
+
+**Deferred (do not restart research automatically):** operator reuse
+terms, precise status semantics, operating-hours verification, and
+whether Quebrada Arriba/Zona Franca appear in the public live API.
+Resume only when the user elects to publish or new material information
+becomes available.
+
+**Next separate website research candidate:** PalmiBici Palmira,
+`https://palmibici-pwa.web.app/`, with public frontend and historic
+`back.palmibici.com.co` backend reference, but no confirmed anonymous
+availability endpoint (see `docs/research/palmibici-palmira.md`).
+
