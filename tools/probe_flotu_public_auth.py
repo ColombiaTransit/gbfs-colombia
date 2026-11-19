@@ -94,6 +94,61 @@ def probe():
                     print("PROBE_ERROR", method, path, type(exc).__name__, str(exc)[:120])
 
 
+
+def summarize_anonymous_vehicle_json():
+    """Bounded shape-only check. Read an anonymous response into memory; print NO values."""
+    url = ORIGIN + "/api/v1/vehicles/"
+    try:
+        with requests.get(
+            url, timeout=TIMEOUT, stream=True, allow_redirects=False,
+            headers={"Accept": "application/json",
+                     "User-Agent": "ColombiaTransit-GBFS-Research/1.0"},
+        ) as response:
+            result = {
+                "endpoint": "/api/v1/vehicles/",
+                "http_status": response.status_code,
+                "content_type": response.headers.get("Content-Type", "").split(";")[0][:65],
+                "anonymous": True,
+                "retains_record_values": False,
+            }
+            if response.status_code != 200 or "json" not in result["content_type"].lower():
+                print("JSON_SHAPE", json.dumps(result))
+                return
+            max_bytes = 128_000
+            buffer = bytearray()
+            for chunk in response.iter_content(chunk_size=4096):
+                buffer.extend(chunk)
+                if len(buffer) > max_bytes:
+                    result["shape"] = "too_large_to_safely_inspect"
+                    print("JSON_SHAPE", json.dumps(result))
+                    return
+            data = json.loads(buffer)
+            # discard raw bytes before output
+            del buffer
+            result["shape"] = type(data).__name__
+            if isinstance(data, list):
+                result["record_count"] = len(data)
+                if data and isinstance(data[0], dict):
+                    result["first_record_field_names"] = sorted(
+                        str(k)[:45] for k in data[0].keys())[:35]
+            elif isinstance(data, dict):
+                result["top_level_field_names"] = sorted(
+                    str(k)[:45] for k in data.keys())[:35]
+                for key in ("data", "results", "items", "vehicles"):
+                    if isinstance(data.get(key), list):
+                        result["array_key"] = key
+                        result["record_count"] = len(data[key])
+                        if data[key] and isinstance(data[key][0], dict):
+                            result["first_record_field_names"] = sorted(
+                                str(k)[:45] for k in data[key][0].keys())[:35]
+                        break
+                result["has_error_key"] = any(key in data for key in ("error","errors","detail"))
+            # no values, per-vehicle data, tokens, coordinates, or response bodies in log.
+            print("JSON_SHAPE", json.dumps(result))
+    except Exception as exc:
+        print("JSON_SHAPE_ERROR", type(exc).__name__, str(exc)[:140])
+
+
 def main():
     r = requests.get(BUNDLE, timeout=TIMEOUT, allow_redirects=False)
     r.raise_for_status()
@@ -107,6 +162,7 @@ def main():
     print("PUBLIC_STATIC_JS", BUNDLE, "bytes", len(r.content))
     static_inspection(source)
     probe()
+    summarize_anonymous_vehicle_json()
 
 
 if __name__ == "__main__":
