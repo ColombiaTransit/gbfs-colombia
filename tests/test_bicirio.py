@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from colombia_gbfs.scrapers.bicirio import (
     BICYCLES_URL_PREFIX, STATIONS_URL, BiciRio, BiciRioStation,
-    corrected_coordinates,
+    corrected_coordinates, station_coordinates, OFFICIAL_MAP_COORDINATES,
 )
 from colombia_gbfs.scrapers.bicirio import BOUNDS
 
@@ -82,6 +82,7 @@ class BiciRioTests(unittest.TestCase):
             station(21, "El Faro", 6.147648, -75.39029),
             station(22, "Villa Camila", -75.4012, 6.156),
             station(24, "Porvenir 50", -75.39029, 6.147648),
+            station(31, "La Cuarta", -75.39029, 6.147648),
             station(36, "San Antonio", -75.3700, 6.1590, state="Closed"),
             station(37, "Palos Verdes", -75.3900, 6.1500, connected=False),
             station(38, "Bodega", -75.3800, 6.1550),
@@ -92,6 +93,8 @@ class BiciRioTests(unittest.TestCase):
         self.fixtures.update({
             BICYCLES_URL_PREFIX + "21": [{"id": "private-id", "serial": "private-serial", "bicycleState": "Ready"}],
             BICYCLES_URL_PREFIX + "22": [{"bicycleState": "Ready"}, {"bicycleState": "Ready"}],
+            BICYCLES_URL_PREFIX + "24": [{"bicycleState": "Ready"}],
+            BICYCLES_URL_PREFIX + "31": [{"bicycleState": "Ready"}],
             BICYCLES_URL_PREFIX + "36": [],
             BICYCLES_URL_PREFIX + "37": [],
         })
@@ -105,21 +108,64 @@ class BiciRioTests(unittest.TestCase):
         self.assertEqual(corrected_coordinates(self.roster[1]), (6.156, -75.4012))
         self.assertIsNone(corrected_coordinates(self.roster[-1]))
 
+    def test_all_official_map_markers_have_unique_valid_positions(self):
+        self.assertEqual(len(OFFICIAL_MAP_COORDINATES), 18)
+        self.assertEqual(len(set(OFFICIAL_MAP_COORDINATES.values())), 18)
+        for coords in OFFICIAL_MAP_COORDINATES.values():
+            self.assertTrue(BOUNDS["south"] <= coords[0] <= BOUNDS["north"])
+            self.assertTrue(BOUNDS["west"] <= coords[1] <= BOUNDS["east"])
+
+    def test_official_map_resolves_three_conflicting_api_locations(self):
+        points = [station_coordinates(item) for item in self.roster
+                  if item["id"] in (21, 24, 31)]
+        self.assertEqual(len(points), 3)
+        self.assertEqual(len(set(points)), 3)
+        self.assertEqual(points[0], (6.1412796, -75.3770481))
+        self.assertEqual(points[1], (6.1476775, -75.3893921))
+        self.assertEqual(points[2], (6.150792, -75.392205))
+
+    def test_official_map_name_aliases_and_accent_normalization(self):
+        variants = {
+            "EDIFICIOS": "los edificios",
+            "Hospital": "el hospital",
+            "San Nicolás": "san nicolas",
+            "Plaza de la Libertad": "plaza de la libertad",
+        }
+        for api_name, public_name in variants.items():
+            with self.subTest(api_name=api_name):
+                record = station(99, api_name, -75.39029, 6.147648)
+                self.assertEqual(station_coordinates(record),
+                                 OFFICIAL_MAP_COORDINATES[public_name])
+
+    def test_new_unmapped_valid_station_retains_api_position(self):
+        unknown = station(98, "New public station", -75.31, 6.18)
+        self.assertEqual(station_coordinates(unknown), (6.18, -75.31))
+        unknown["latitude"] = 0
+        unknown["longitude"] = 0
+        self.assertIsNone(station_coordinates(unknown))
+
     def test_complete_snapshot_and_availability_follow_official_website(self):
         network = BiciRio("bicirio-rionegro", META)
         client = FakeSession(self.fixtures)
         self.fake_update(network, client)
-        self.assertEqual(len(network.stations), 4)
+        self.assertEqual(len(network.stations), 6)
         by_id = {x.extra["uid"]: x for x in network.stations}
-        self.assertEqual(set(by_id), {"21", "22", "36", "37"})
+        self.assertEqual(set(by_id), {"21", "22", "24", "31", "36", "37"})
         self.assertEqual(by_id["21"].bikes, 1)
         self.assertEqual(by_id["22"].bikes, 2)
         self.assertIsNone(by_id["22"].free)
-        self.assertEqual(by_id["22"].longitude, -75.4012)
+        self.assertEqual((by_id["22"].latitude, by_id["22"].longitude),
+                         OFFICIAL_MAP_COORDINATES["villa camila"])
+        self.assertEqual((by_id["21"].latitude, by_id["21"].longitude),
+                         OFFICIAL_MAP_COORDINATES["el faro"])
+        self.assertEqual((by_id["24"].latitude, by_id["24"].longitude),
+                         OFFICIAL_MAP_COORDINATES["porvenir 50"])
+        self.assertEqual((by_id["31"].latitude, by_id["31"].longitude),
+                         OFFICIAL_MAP_COORDINATES["la cuarta"])
         self.assertTrue(by_id["21"].extra["online"])
         self.assertFalse(by_id["36"].extra["online"])
         self.assertFalse(by_id["37"].extra["online"])
-        self.assertEqual(len(client.calls), 5)
+        self.assertEqual(len(client.calls), 7)
         for url, settings in client.calls:
             self.assertEqual(settings["verify"], str(self.bundle))
             self.assertFalse(settings["allow_redirects"])
