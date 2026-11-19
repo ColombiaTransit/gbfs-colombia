@@ -69,6 +69,48 @@ Cloudflare Workers Free currently includes 100,000 incoming requests/day, 10 ms 
 
 **Production:** No deployment, adaptation of the PyBikes scraper, or activation of a new GBFS feed occurs automatically. First verify consistent source responses, the validity of the actual data, usage terms/licensing, and whether a worker token can be safely passed to the Python publisher.
 
+## First real Cloudflare diagnosis: blocked (2026-11-19)
+
+The user ran the deployed Worker `GET /diagnose` at **2026-11-19T06:50:32Z**:
+
+| Signal | Observation |
+| --- | --- |
+| Worker execution colo | `AMS` (Amsterdam) |
+| Egress IP estimate | Cloudflare IPv6; third-party GeoIP classified **US** |
+| Official EnCicla availability endpoint | **HTTP 403**, `text/html` |
+| JSON station data | None (`reachable=false`) |
+
+**Interpretation:** The Worker is executing and outbound requests are being made,
+but the official EnCicla endpoint refuses this request. This is consistent
+with GeoIP filtering but is **not conclusive proof**; WAF, traffic policy,
+or automation controls could also produce a 403. The GeoIP lookup is not
+necessarily the IP or country seen by EnCicla.
+
+**Action (beginner-friendly):** In Cloudflare, open **Workers & Pages >
+colombiatransit-encicla-test > Settings > General > Placement > Smart**,
+save, allow up to 15 minutes for placement analysis, then run
+`/diagnose` again using the token-protected PowerShell command above.
+Compare `worker_edge_colo`, `egress_estimate.country` and
+`upstream.http_status`. One-off low-traffic Workers may remain at
+the original data center; Smart Placement is an optimization, not an
+IP-country guarantee. Documentation:
+https://developers.cloudflare.com/workers/configuration/placement/
+
+For a more controlled follow-up, Cloudflare also offers an
+**experimental** explicit host placement hint
+(`"placement": { "hostname": "webapp.metropol.gov.co" }` in
+`wrangler.jsonc`), but this requires a redeployment via Wrangler and
+still does **not** guarantee a Colombian egress address. The existing
+Worker is intentionally left unchanged, so the deployed baseline can
+be compared with the Smart Placement test.
+
+If EnCicla continues to return HTTP 403, **do not** repeatedly probe
+the endpoint or adjust request headers to imitate a browser. Seek
+official API access or approved allowlisting; a Colombian-hosted
+read-only relay is an option only where the operator authorizes this.
+Keep the production GBFS feed unchanged until access and licensing
+are validated.
+
 ## Official references
 
 - https://developers.cloudflare.com/workers/get-started/dashboard/
