@@ -1,6 +1,6 @@
 # PalmiBici (Palmira) — GBFS feasibility register
 
-Status: **research only; no confirmed public availability endpoint**  
+Status: **registration/login required in PWA (user-observed); no confirmed anonymous availability endpoint**  
 Investigated: 2026-11-15  
 Candidate GBFS tag: `palmibici-palmira` (not enabled)  
 Location: Palmira, Valle del Cauca, Colombia  
@@ -58,6 +58,35 @@ Verified via GitHub Actions runner:
   nested endpoints exist. Nor does UI text prove an anonymous public
   availability API. No usable anonymous station/availability response
   was established in these tests.
+
+## Registration gate verified and scope decision (2026-11-19)
+
+The user confirmed that opening the PalmiBici webapp leads to
+**registration/login before accessing its functionality**.
+
+The operator's public website separately documents a registration
+process: existing users sign in with username and password;
+new users register, then visit the operations centre for their
+system card. Source: https://palmibici.com.co/
+
+**Distinguish three separate facts:**
+1. The PWA has a registration/login gate for the relevant user
+   interface, as the user observed.
+2. Its static JavaScript assets are publicly retrievable, and a
+   backend hostname was previously discovered.
+3. Neither fact establishes an **anonymous, publicly licensed,
+   realtime availability API**. The only tested root backend
+   URLs returned 404; no legitimate anonymous station-data
+   endpoint has been confirmed.
+
+**Decision:** Hold PalmiBici at research-only status; do not create
+accounts solely for scraping, use another person's credentials,
+invoke private/authenticated fleet endpoints, or register an active
+GBFS adapter. Researching the existing public JavaScript may identify
+an explicitly anonymous station endpoint in future; if one is not
+available, seek an official read-only feed or operator permission.
+Private authenticated customer views must not be treated as a
+public feed.
 
 ## Next steps before implementing an adapter
 
