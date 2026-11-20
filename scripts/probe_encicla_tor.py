@@ -74,7 +74,7 @@ def exit_info(s, timeout):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default=os.getenv("ENCICLA_PROBE_URL", ""))
+    parser.add_argument("--url", default=os.getenv("ENCICLA_PROBE_URL", "https://webapp.metropol.gov.co/wsencicla/api/Disponibilidad/GetDisponibilidadMapas"))
     parser.add_argument("--output", default="artifacts/encicla-tor-probe.json")
     parser.add_argument("--timeout", type=int, default=25)
     args = parser.parse_args()
@@ -84,7 +84,21 @@ def main():
     report = {"checked_at": dt.datetime.now(dt.timezone.utc).isoformat(), "endpoint_host": parsed.hostname, "endpoint_path": parsed.path, "tests": {}}
     for label, use_tor in [("direct", False), ("tor", True)]:
         s = session(use_tor)
-        report["tests"][label] = {"exit": exit_info(s, args.timeout), "upstream": request_summary(s, args.url, args.timeout)}
+        geo = exit_info(s, args.timeout)
+        if use_tor:
+            # No false positives: only an independently confirmed CO exit counts.
+            verified = geo.get("country_code", "").upper() == "CO"
+            report["tests"][label] = {
+                "required_exit_country": "CO",
+                "colombia_exit_verified": verified,
+                "exit": geo,
+                "upstream": request_summary(s, args.url, args.timeout) if verified else {
+                    "skipped": True,
+                    "reason": "Colombian Tor exit could not be verified; no EnCicla request sent",
+                },
+            }
+        else:
+            report["tests"][label] = {"exit": geo, "upstream": request_summary(s, args.url, args.timeout)}
         s.close()
     target = Path(args.output)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -94,6 +108,8 @@ def main():
     tor = report["tests"]["tor"]["upstream"]
     if tor.get("data_received"):
         print("RESULT: TOR_RETURNED_JSON; inspect records and shape.")
+    elif not report["tests"]["tor"].get("colombia_exit_verified"):
+        print("RESULT: CO_EXIT_UNAVAILABLE_OR_UNVERIFIED; Tor EnCicla request skipped.")
     elif direct.get("data_received"):
         print("RESULT: DIRECT_RETURNED_JSON; Tor did not improve access.")
     else:
