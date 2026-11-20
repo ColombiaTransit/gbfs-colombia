@@ -211,6 +211,58 @@ network is registered, the adapter subclasses `BikeShareSystem`, and
 its metadata declares `country: CO` and a `company` list. Unregistered or foreign network
 tags fail fast rather than silently enabling global collectors.
 
+## EnCicla via Azure Function (opt-in)
+
+The official EnCicla upstream API may block the publisher server IP.
+An existing Azure Function in West US has successfully relayed the original
+139-record JSON array through the authenticated `/api/encicla-data` endpoint.
+This repository supports an **opt-in, EnCicla-only** transport override, while
+retaining the upstream PyBikes `Encicla` parsing, station IDs, metadata, and
+the normal Hyper/GBFS publication pipeline. Tembici and other systems do not
+use the Azure relay.
+
+On the actual Docker host, add to the private `.env`:
+
+```dotenv
+ENCICLA_PROXY_URL=https://func-encicla-probe.azurewebsites.net/api/encicla-data
+ENCICLA_FUNCTION_KEY=<function-key-from-azure-portal>
+```
+
+Get the key in Azure Portal under the Function App's **Functions →
+encicla-data → Get function URL**. Do not commit it, put it in the request
+URL, expose it in logs, or use a GitHub Actions build secret. The publisher
+loads both values through `compose.yaml`'s existing `env_file`; no new
+container, volume, endpoint, or port is required.
+
+After the container image CI build and smoke test **have succeeded**, on the
+Docker host:
+
+```sh
+docker compose pull
+docker compose up -d
+docker compose logs --tail=100 publisher subscriber
+```
+
+A focused direct test from the publisher (without exposing the key) is:
+
+```sh
+docker compose exec -T publisher python -c 'import os,requests; url=os.environ["ENCICLA_PROXY_URL"]; k=os.environ["ENCICLA_FUNCTION_KEY"]; r=requests.get(url,headers={"x-functions-key":k},timeout=15); r.raise_for_status(); data=r.json(); assert isinstance(data,list); print("EnCicla records:",len(data))'
+```
+
+Observe an actual updated EnCicla station snapshot in the subscriber/database
+and GBFS output, not only container liveness. An upstream error fails that
+update rather than publishing fabricated zero availability or falling back to
+the blocked direct endpoint.
+
+To roll back to the original upstream transport, clear both
+`ENCICLA_PROXY_URL` and `ENCICLA_FUNCTION_KEY` in `.env` and run
+`docker compose up -d` again. If the original server IP remains blocked,
+EnCicla updates will again fail; other networks are unaffected.
+
+This integration does not cache or schedule an additional poll in Azure. Only
+the existing publisher's `UPDATE_INTERVAL_SECONDS` drives requests; each
+successful Azure relay invocation performs one direct upstream GET.
+
 ## Operations
 
 ```sh
