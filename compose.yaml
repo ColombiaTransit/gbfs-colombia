@@ -24,6 +24,10 @@ services:
     environment:
       ENABLED_NETWORKS: ${ENABLED_NETWORKS:-encicla,tembici-bogota}
       UPDATE_INTERVAL_SECONDS: ${UPDATE_INTERVAL_SECONDS:-180}
+      # Portainer stack variables are Compose substitutions, not automatically
+      # injected into the publisher container. Pass only the EnCicla settings.
+      ENCICLA_PROXY_URL: ${ENCICLA_PROXY_URL:-}
+      ENCICLA_FUNCTION_KEY: ${ENCICLA_FUNCTION_KEY:-}
       ZMQ_LISTEN: tcp://0.0.0.0:5555
       N_WORKERS_PYBIKES: "4"
     networks:
