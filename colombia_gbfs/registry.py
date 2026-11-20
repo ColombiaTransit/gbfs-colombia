@@ -97,6 +97,17 @@ def activate(allowed=None, registry_path=None):
             module, cls, entry = upstream_by_tag[tag]
             if entry.get("meta", {}).get("country") != "CO":
                 raise ValueError(f"Refusing non-Colombian upstream network: {tag}")
+            if tag == "encicla":
+                # Only EnCicla switches transport when the operator explicitly
+                # configures the Azure relay. All source parsing stays upstream.
+                from colombia_gbfs.scrapers.encicla_proxy import proxy_settings
+                if proxy_settings() is not None:
+                    module_name = "colombia_encicla_proxy"
+                    aliases[module_name] = importlib.import_module(
+                        "colombia_gbfs.scrapers.encicla_proxy"
+                    )
+                    selected.append((module_name, "EnciclaProxy", entry))
+                    continue
             selected.append((module, cls, entry))
             continue
         spec = custom_by_tag.get(tag)
