@@ -4,9 +4,13 @@ Colombia-only GBFS 3.0 feeds built with [PyBikes](https://github.com/eskerda/pyb
 [CityBikes Hyper](https://github.com/citybikes/hyper), and
 [CityBikes GBFS API](https://github.com/citybikes/gbfs-api).
 
-The project initially enables **EnCicla** (Medellín / Valle de Aburrá) and
-**Tembici Bogotá**, with an extension mechanism for additional Colombian
-scrapers. It does not scrape or publish networks outside Colombia.
+The default configuration enables **EnCicla** (Medellín / Valle de Aburrá) and
+**Tembici Bogotá**. **BiciRio Rionegro** is implemented and opt-in. An observed
+publisher run on 2026-11-20 successfully emitted **138 EnCicla**, **238
+Tembici**, and **16 BiciRio** stations with all three enabled (one snapshot,
+not guaranteed permanent totals). BiciRio still has source-completeness and
+redistribution/usage questions documented below. No non-Colombian networks
+are exposed.
 
 ## Architecture
 
@@ -45,6 +49,7 @@ Once live provider updates have arrived, **from a container on the
 - `http://gbfs-colombia:8000/3/manifest.json`
 - `http://gbfs-colombia:8000/3/encicla/gbfs.json`
 - `http://gbfs-colombia:8000/3/tembici-bogota/gbfs.json`
+- `http://gbfs-colombia:8000/3/bicirio-rionegro/gbfs.json` (only when enabled)
 - `http://gbfs-colombia:8000/healthz` (API liveness only)
 
 The host cannot access these URLs directly. To check liveness on the server:
@@ -69,18 +74,28 @@ version.
 
 **Data freshness is not guaranteed by the health endpoint.** Check
 `last_updated`, provider availability, and logs before advertising feeds.
-The initial GBFS outputs depend on the live upstream endpoints being reachable.
+The GBFS outputs depend on live provider updates. EnCicla can use a dedicated
+Azure Function relay when configured; other networks fetch their sources directly.
 GBFS 3.0 requires a monitored `feed_contact_email` and
 `opening_hours`. Until `GBFS_CONTACT_EMAIL` is provided,
 `system_information.json` returns HTTP 503 instead of inventing a contact.
 The initial `24/7 unknown` opening_hours expression explicitly indicates
 unverified hours; replace it with verified OSM opening_hours values per
 network using `GBFS_OPENING_HOURS_<TAG>` (tag upper-cased, `-` replaced
-by `_`), e.g. `GBFS_OPENING_HOURS_ENCICLA` or
-`GBFS_OPENING_HOURS_TEMBICI_BOGOTA`. The `api` and `publisher` services
-read `.env` directly, so these work for any enabled network without
-editing `compose.yaml`.
-Changes to `.env` take effect after `docker compose up -d`.
+by `_`), e.g. `GBFS_OPENING_HOURS_ENCICLA`,
+`GBFS_OPENING_HOURS_TEMBICI_BOGOTA`, or
+`GBFS_OPENING_HOURS_BICIRIO_RIONEGRO`.
+
+For local Docker Compose, the optional `.env` file provides Compose
+substitution and is also loaded by the publisher/API through `env_file`.
+For **Portainer stacks**, values entered in the stack's **Environment
+variables** interface are Compose substitutions, **not** automatically
+injected into a container. The current `compose.yaml` explicitly passes
+`ENABLED_NETWORKS`, `UPDATE_INTERVAL_SECONDS`,
+`ENCICLA_PROXY_URL`, and `ENCICLA_FUNCTION_KEY` to the publisher,
+plus the API's relevant settings. Recreate the affected containers
+after changing their environment (Portainer **Update the stack** or
+`docker compose up -d`). Do not paste secrets into screenshots or logs.
 
 ## Image and releases
 
@@ -136,7 +151,8 @@ These are a single snapshot, not permanent network totals.
   from GoDaddy, fingerprint-checked, and included in a **BiciRio-only
   Requests CA bundle**. Normal hostname and certificate verification
   remain enabled. The system-wide trust store is not modified.
-- **Not enabled by default**: the map lists 18 named locations but two
+- **Not enabled by default** (although tested running in the user's stack
+  on 2026-11-20): the map lists 18 named locations but two
   of them (Quebrada Arriba and Zona Franca) are not in the current
   anonymous station API; no fake availability is published for those.
   Redistribution terms and service-status semantics should also be
@@ -213,29 +229,64 @@ tags fail fast rather than silently enabling global collectors.
 
 ## EnCicla via Azure Function (opt-in)
 
-The official EnCicla upstream API may block the publisher server IP.
-An existing Azure Function in West US has successfully relayed the original
-139-record JSON array through the authenticated `/api/encicla-data` endpoint.
-This repository supports an **opt-in, EnCicla-only** transport override, while
-retaining the upstream PyBikes `Encicla` parsing, station IDs, metadata, and
-the normal Hyper/GBFS publication pipeline. Tembici and other systems do not
-use the Azure relay.
+The publisher host cannot reliably access the official EnCicla API directly.
+The **production-tested** Azure Function (West US, Flex Consumption)
+exposes the authenticated `/api/encicla-data` relay. The 2026-11-20
+publisher log confirmed:
 
-On the actual Docker host, add to the private `.env`:
-
-```dotenv
-ENCICLA_PROXY_URL=https://func-encicla-probe.azurewebsites.net/api/encicla-data
-ENCICLA_FUNCTION_KEY=<function-key-from-azure-portal>
+```text
+[encicla] stations 138
+[encicla] Publishing network:EnciclaProxy:encicla:update
 ```
 
-Get the key in Azure Portal under the Function App's **Functions →
-encicla-data → Get function URL**. Do not commit it, put it in the request
-URL, expose it in logs, or use a GitHub Actions build secret. The publisher
-loads both values through `compose.yaml`'s existing `env_file`; no new
-container, volume, endpoint, or port is required.
+The upstream API can return a slightly different number of *raw* records:
+a direct Azure test returned 139 JSON records, while PyBikes filters
+operation-centre entries before publishing stations.
 
-After the container image CI build and smoke test **have succeeded**, on the
-Docker host:
+The relay changes only EnCicla's HTTP transport. It retains the pinned
+upstream PyBikes `Encicla` station parsing, identifiers and metadata and
+the normal Hyper → subscriber → GBFS 3.0 pipeline. Tembici and BiciRio
+do not use Azure. Each scheduled EnCicla update makes one request via
+Azure; there is **no application cache, timer, or Tor/Cloudflare proxy**.
+
+### Configuration: Docker Compose or Portainer
+
+Use these private environment variables on the **publisher**:
+
+```dotenv
+ENABLED_NETWORKS=encicla,tembici-bogota
+UPDATE_INTERVAL_SECONDS=180
+ENCICLA_PROXY_URL=https://func-encicla-probe-c9d2cuavbab5fga8.westus-01.azurewebsites.net/api/encicla-data
+ENCICLA_FUNCTION_KEY=<function-key-from-azure>
+```
+
+The URL above is the deployment hostname used for the successful live
+test. Confirm the actual hostname in Azure Portal → Function App →
+Functions → `encicla-data` → **Get function URL**. Supply the key via
+the `x-functions-key` HTTP header, never as a URL parameter.
+
+In **Portainer**, set these under the stack's **Environment variables** and
+choose **Update the stack**. `compose.yaml` explicitly forwards the two
+`ENCICLA_*` values to the publisher. For command-line Compose, place them
+in the private `.env` instead and recreate the publisher.
+
+Never store the key in GitHub or paste it into screenshots, public logs,
+or issue comments. **If a Function Key has been exposed, rotate it in
+Azure and update the stack environment.**
+
+To enable BiciRio *as an explicit opt-in* as well:
+
+```dotenv
+ENABLED_NETWORKS=encicla,tembici-bogota,bicirio-rionegro
+```
+
+BiciRio has been observed to publish 16 stations successfully, but
+review the source/permission caveats in its section before relying on
+its feed.
+
+### Verification and troubleshooting
+
+After the image build and container smoke test pass:
 
 ```sh
 docker compose pull
@@ -243,25 +294,54 @@ docker compose up -d
 docker compose logs --tail=100 publisher subscriber
 ```
 
-A focused direct test from the publisher (without exposing the key) is:
+Verify the EnCicla environment *without printing the key*:
 
 ```sh
-docker compose exec -T publisher python -c 'import os,requests; url=os.environ["ENCICLA_PROXY_URL"]; k=os.environ["ENCICLA_FUNCTION_KEY"]; r=requests.get(url,headers={"x-functions-key":k},timeout=15); r.raise_for_status(); data=r.json(); assert isinstance(data,list); print("EnCicla records:",len(data))'
+docker compose exec -T publisher python -c 'import os; print("Proxy URL:", os.getenv("ENCICLA_PROXY_URL")); print("Key set:", bool(os.getenv("ENCICLA_FUNCTION_KEY")))'
 ```
 
-Observe an actual updated EnCicla station snapshot in the subscriber/database
-and GBFS output, not only container liveness. An upstream error fails that
-update rather than publishing fabricated zero availability or falling back to
+Verify that the custom scraper, not the direct upstream scraper, is
+selected:
+
+```sh
+docker compose exec -T publisher python -c 'from colombia_gbfs.registry import activate; print([(m,c) for m,c,r in activate() if r["tag"]=="encicla"])'
+```
+
+Expected when configured:
+
+```text
+[('colombia_encicla_proxy', 'EnciclaProxy')]
+```
+
+The publisher should then log `Publishing network:EnciclaProxy:encicla:update`.
+A `json.decoder.JSONDecodeError: Expecting value: line 1 column 1`
+may indicate the original PyBikes transport is still selected and
+receiving an HTML/blocked response. Confirm both variables reached
+the container and that the new image is running.
+
+For a bounded live relay check from the publisher container:
+
+```sh
+docker compose exec -T publisher python -c 'import os,requests; u=os.environ["ENCICLA_PROXY_URL"]; k=os.environ["ENCICLA_FUNCTION_KEY"]; r=requests.get(u,headers={"x-functions-key":k},timeout=15); r.raise_for_status(); v=r.json(); assert isinstance(v,list); print("EnCicla records:",len(v))'
+```
+
+Finally check the subscriber and `/3/encicla/station_status.json`
+on the shared Docker network for recent timestamps. The API `/healthz`
+route confirms only liveness, not source freshness.
+
+On Azure HTTP errors, timeouts or invalid JSON, the EnCicla update fails
+rather than publishing fabricated zero availability or falling back to
 the blocked direct endpoint.
 
-To roll back to the original upstream transport, clear both
-`ENCICLA_PROXY_URL` and `ENCICLA_FUNCTION_KEY` in `.env` and run
-`docker compose up -d` again. If the original server IP remains blocked,
-EnCicla updates will again fail; other networks are unaffected.
+To disable the override, clear **both**
+`ENCICLA_PROXY_URL` and `ENCICLA_FUNCTION_KEY` and recreate the publisher.
+This restores direct upstream transport, which may still be blocked.
+It does not affect Tembici or BiciRio.
 
-This integration does not cache or schedule an additional poll in Azure. Only
-the existing publisher's `UPDATE_INTERVAL_SECONDS` drives requests; each
-successful Azure relay invocation performs one direct upstream GET.
+Azure deployment: [EnCicla Function workflow](.github/workflows/encicla-azure-function.yml).
+Docker image deployment: [Container workflow](.github/workflows/container.yml).
+The former Tor and Cloudflare experimental probes and their workflows
+were removed after the Azure solution was verified.
 
 ## Operations
 
