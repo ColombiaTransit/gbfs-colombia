@@ -22,7 +22,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y tor
           python -m pip install --disable-pip-version-check 'requests[socks]>=2.32,<3'
-          sudo systemctl start tor
+          # ExitNodes is a constraint, not proof of location. StrictNodes
+          # forbids automatic fallback to a non-Colombian exit relay.
+          printf '\\nExitNodes {co}\\nStrictNodes 1\\n' | sudo tee -a /etc/tor/torrc
+          sudo tor --verify-config -f /etc/tor/torrc
+          sudo systemctl restart tor@default.service
           for attempt in $(seq 1 30); do
             if (echo >/dev/tcp/127.0.0.1/9050) 2>/dev/null; then
               echo "Tor SOCKS port ready"
@@ -37,11 +41,7 @@ jobs:
           ENCICLA_INPUT_URL: ${{ inputs.endpoint_url }}
           ENCICLA_DEFAULT_URL: ${{ vars.ENCICLA_PROBE_URL }}
         run: |
-          export ENCICLA_PROBE_URL="${ENCICLA_INPUT_URL:-$ENCICLA_DEFAULT_URL}"
-          if [[ -z "$ENCICLA_PROBE_URL" ]]; then
-            echo 'Provide endpoint_url when starting this workflow or set the ENCICLA_PROBE_URL repository variable.' >&2
-            exit 2
-          fi
+          export ENCICLA_PROBE_URL="${ENCICLA_INPUT_URL:-${ENCICLA_DEFAULT_URL:-https://webapp.metropol.gov.co/wsencicla/api/Disponibilidad/GetDisponibilidadMapas}}"
           python scripts/probe_encicla_tor.py --output artifacts/encicla-tor-probe.json
       - name: Upload diagnostic report
         if: always()
@@ -50,4 +50,4 @@ jobs:
           name: encicla-tor-probe
           path: artifacts/encicla-tor-probe.json
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 7
