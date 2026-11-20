@@ -1,9 +1,14 @@
 # EnCicla Azure Functions connectivity probe
 
-A minimal, **manual**, authenticated Azure Functions Python v2 HTTP endpoint to
-test whether Azure Functions can read the same official EnCicla endpoint that
-returned 139 records in GitHub Actions. This does **not** modify the running
-Docker publisher, create a public data mirror, or schedule any polling.
+An Azure Functions Python v2 app with two authenticated HTTP endpoints:
+- `GET /api/encicla-probe`: manual network connectivity diagnostics (retained).
+- `GET /api/encicla-data`: **uncached**, one-to-one JSON relay to the official
+  EnCicla `GetDisponibilidadMapas` endpoint, intended for the single existing
+  PyBikes publisher container.
+
+Neither endpoint schedules polling or changes the running Docker publisher.
+No extra Azure database, cache, or timer is used. The normal Python Azure
+Functions hosting storage requirement is separate from application caching.
 
 ## Deployment
 
@@ -44,3 +49,32 @@ necessarily use the same outbound IP pool as GitHub Actions runners**.
 
 After testing, disable or delete the Azure resources if they are not required.
 This probe does not change PyBikes, GBFS publishing, or any production route.
+
+## EnCicla data relay
+
+After the GitHub workflow has deployed the current version, obtain a Function
+key from the Azure Portal and call:
+
+```sh
+curl -fsS \
+  -H "x-functions-key: <FUNCTION_KEY>" \
+  -H "Accept: application/json" \
+  "https://<APP_NAME>.azurewebsites.net/api/encicla-data"
+```
+
+The response is the exact upstream JSON bytes (an array of station records)
+on HTTP 200. Every invocation triggers exactly one EnCicla upstream request,
+with a 12-second timeout and 1 MiB response limit; the request body is never
+stored or written to logs. The service sets `Cache-Control: no-store`.
+An upstream HTTP error, invalid JSON, or unexpected JSON object yields HTTP
+502 and a small error JSON; connectivity timeout yields HTTP 504. No stale
+data and no fabricated zero counts.
+
+Azure Functions enforces the `FUNCTION` authorization level; keep the
+Function key in Docker secrets or an environment variable, not in git. Do
+not pass it in URLs or public logs. The existing PyBikes/GBFS Docker code is
+**not yet changed** to consume the relay endpoint. That requires a targeted
+configuration/adapter update and a follow-up smoke test.
+
+Offline coverage includes `tests/test_proxy.py` and is executed by the
+existing Azure deploy workflow before deployment.
