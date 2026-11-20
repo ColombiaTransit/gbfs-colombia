@@ -24,7 +24,7 @@ jobs:
           python -m pip install --disable-pip-version-check 'requests[socks]>=2.32,<3'
           # ExitNodes is a constraint, not proof of location. StrictNodes
           # forbids automatic fallback to a non-Colombian exit relay.
-          printf '\\nExitNodes {co}\\nStrictNodes 1\\n' | sudo tee -a /etc/tor/torrc
+          printf '%s\n' '' 'ExitNodes {co}' 'StrictNodes 1' | sudo tee -a /etc/tor/torrc
           sudo tor --verify-config -f /etc/tor/torrc
           sudo systemctl restart tor@default.service
           for attempt in $(seq 1 30); do
